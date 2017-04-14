@@ -1,9 +1,11 @@
 ﻿using System;
 using System.Threading.Tasks;
 using WebSocketManager.Client;
+
 public class Program
 {
     private static Connection _connection;
+
     public static void Main(string[] args)
     {
         StartConnectionAsync();
@@ -13,7 +15,15 @@ public class Program
             Console.WriteLine($"{arguments[0]} said: {arguments[1]}");
         });
 
-        Console.ReadLine();
+        Console.WriteLine("// Type your message and hit Enter to send. Type '/quit' or '/exit' to close.");
+        while (true)
+        {
+            var line = Console.ReadLine();
+            if (line == "/quit" || line == "/exit") break;
+
+            SendMessage(line);
+        }
+
         StopConnectionAsync();
     }
 
@@ -26,5 +36,10 @@ public class Program
     public static async Task StopConnectionAsync()
     {
         await _connection.StopConnectionAsync();
+    }
+
+    public static async Task SendMessage(string message)
+    {
+        await _connection.Invoke("SendMessage", _connection.ConnectionId, message);
     }
 }
