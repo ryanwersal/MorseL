@@ -106,27 +106,45 @@ namespace WebSocketManager
                 return;
             }
 
+            var invocationResultDescriptor = new InvocationResultDescriptor {Id = invocationDescriptor.Id};
+
             try
             {
-                method.Invoke(this, invocationDescriptor.Arguments);
+                dynamic methodResult = method.Invoke(this, invocationDescriptor.Arguments);
+                invocationResultDescriptor.Result = await methodResult;
             }
+
             catch (TargetParameterCountException e)
             {
                 await SendMessageAsync(socket, new Message()
-                {
-                    MessageType = MessageType.Text,
-                    Data = $"The {invocationDescriptor.MethodName} method does not take {invocationDescriptor.Arguments.Length} parameters!"
-                }).ConfigureAwait(false);
+                    {
+                        MessageType = MessageType.Text,
+                        Data =
+                            $"The {invocationDescriptor.MethodName} method does not take {invocationDescriptor.Arguments.Length} parameters!"
+                    })
+                    .ConfigureAwait(false);
             }
 
             catch (ArgumentException e)
             {
                 await SendMessageAsync(socket, new Message()
-                {
-                    MessageType = MessageType.Text,
-                    Data = $"The {invocationDescriptor.MethodName} method takes different arguments!"
-                }).ConfigureAwait(false);
+                    {
+                        MessageType = MessageType.Text,
+                        Data = $"The {invocationDescriptor.MethodName} method takes different arguments!"
+                    })
+                    .ConfigureAwait(false);
             }
+
+            catch (Exception e)
+            {
+                invocationResultDescriptor.Error = e.ToString();
+            }
+
+            await SendMessageAsync(socket, new Message
+            {
+                MessageType = MessageType.InvocationResult,
+                Data = JsonConvert.SerializeObject(invocationResultDescriptor)
+            });
         }
     }
 }

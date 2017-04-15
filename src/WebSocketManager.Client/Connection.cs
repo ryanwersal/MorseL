@@ -1,8 +1,7 @@
 ﻿using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
-using System.IO;
 using System.Net.WebSockets;
-using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using Newtonsoft.Json;
@@ -21,16 +20,35 @@ namespace WebSocketManager.Client
         {
             ContractResolver = new CamelCasePropertyNamesContractResolver()
         };
-        private IDictionary<string, InvocationHandler> _handlers = new Dictionary<string, InvocationHandler>();
+
+        private int _nextId = 0;
+
+        private readonly object _pendingCallsLock = new object();
+        private readonly Dictionary<string, InvocationRequest> _pendingCalls = new Dictionary<string, InvocationRequest>();
+        private readonly ConcurrentDictionary<string, InvocationHandler> _handlers = new ConcurrentDictionary<string, InvocationHandler>();
+
+        // TODO: Implement.
+        public event Action Connected
+        {
+            add {  }
+            remove {  }
+        }
+
+        // TODO: Implement.
+        public event Action<Exception> Closed
+        {
+            add {  }
+            remove {  }
+        }
 
         public Connection()
         {
             _clientWebSocket = new ClientWebSocket();
         }
 
-        public async Task StartConnectionAsync(string uri)
+        public async Task StartAsync(Uri uri)
         {
-            await _clientWebSocket.ConnectAsync(new Uri(uri), CancellationToken.None).ConfigureAwait(false);
+            await _clientWebSocket.ConnectAsync(uri, CancellationToken.None).ConfigureAwait(false);
 
             await Receive(message =>
             {
@@ -44,34 +62,88 @@ namespace WebSocketManager.Client
                         var invocationDescriptor = JsonConvert.DeserializeObject<InvocationDescriptor>(message.Data, _jsonSerializerSettings);
                         InvokeOn(invocationDescriptor);
                         break;
+
+                    case MessageType.InvocationResult:
+                        var resultDescriptor = JsonConvert.DeserializeObject<InvocationResultDescriptor>(message.Data, _jsonSerializerSettings);
+                        HandleInvokeResult(resultDescriptor);
+                        break;
                 }
             });
         }
 
+        // TODO: Implement.
+        public void On(string methodName, Type[] types, Action<object[]> handler) => On(methodName, handler);
+
         public void On(string methodName, Action<object[]> handler)
         {
             var invocationHandler = new InvocationHandler(handler, new Type[] { });
-            _handlers.Add(methodName, invocationHandler);
+            _handlers.AddOrUpdate(methodName, invocationHandler, (_, __) => invocationHandler);
         }
 
-        public async Task Invoke(string methodName, params object[] args)
+        public Task<T> Invoke<T>(string methodName, params object[] args) => Invoke<T>(methodName, CancellationToken.None, args);
+        public async Task<T> Invoke<T>(string methodName, CancellationToken cancellationToken, params object[] args) => (T)await Invoke(methodName, typeof(T), cancellationToken, args);
+        public Task<object> Invoke(string methodName, Type returnType, params object[] args) => Invoke(methodName, returnType, CancellationToken.None, args);
+        public async Task<object> Invoke(string methodName, Type returnType, CancellationToken cancellationToken, params object[] args)
         {
-            var invocationDescriptor = new InvocationDescriptor
+            var descriptor = new InvocationDescriptor
             {
+                Id = GetNextId(),
                 MethodName = methodName,
                 Arguments = args
             };
-            var message = JsonConvert.SerializeObject(invocationDescriptor, _jsonSerializerSettings);
-            await _clientWebSocket.SendAllAsync(message, CancellationToken.None).ConfigureAwait(false);
+
+            var request = new InvocationRequest(cancellationToken, returnType);
+
+            lock (_pendingCallsLock)
+            {
+                _pendingCalls.Add(descriptor.Id, request);
+            }
+
+            try
+            {
+                var message = JsonConvert.SerializeObject(descriptor, _jsonSerializerSettings);
+                await _clientWebSocket.SendAllAsync(message, CancellationToken.None).ConfigureAwait(false);
+            }
+            catch (Exception e)
+            {
+                request.Completion.TrySetException(e);
+                lock (_pendingCallsLock)
+                {
+                    _pendingCalls.Remove(descriptor.Id);
+                }
+            }
+
+            return await request.Completion.Task;
         }
 
-        private void InvokeOn(InvocationDescriptor invocationDescriptor)
+        private void InvokeOn(InvocationDescriptor descriptor)
         {
-            var invocationHandler = _handlers[invocationDescriptor.MethodName];
-            invocationHandler?.Handler(invocationDescriptor.Arguments);
+            var invocationHandler = _handlers[descriptor.MethodName];
+            invocationHandler.Handler(descriptor.Arguments);
         }
 
-        public async Task StopConnectionAsync()
+        private void HandleInvokeResult(InvocationResultDescriptor descriptor)
+        {
+            InvocationRequest request;
+            lock (_pendingCallsLock)
+            {
+                request = _pendingCalls[descriptor.Id];
+                _pendingCalls.Remove(descriptor.Id);
+            }
+
+            request.Registration.Dispose();
+
+            if (!string.IsNullOrEmpty(descriptor.Error))
+            {
+                request.Completion.TrySetException(new Exception(descriptor.Error));
+            }
+            else
+            {
+                request.Completion.TrySetResult(descriptor.Result);
+            }
+        }
+
+        public async Task DisposeAsync()
         {
             await _clientWebSocket.CloseOutputAsync(WebSocketCloseStatus.NormalClosure, "", CancellationToken.None).ConfigureAwait(false);
         }
@@ -106,6 +178,11 @@ namespace WebSocketManager.Client
                     }
                 }
             }
+        }
+
+        private string GetNextId()
+        {
+            return Interlocked.Increment(ref _nextId).ToString();
         }
     }
 }

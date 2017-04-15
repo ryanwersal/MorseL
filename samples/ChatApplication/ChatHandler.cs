@@ -8,8 +8,7 @@ namespace ChatApplication
     public class ChatHandler : WebSocketHandler
     {
         public ChatHandler(WebSocketConnectionManager webSocketConnectionManager) : base(webSocketConnectionManager)
-        {
-        }
+        {}
 
         public override async Task OnConnected(WebSocket socket)
         {
@@ -29,6 +28,11 @@ namespace ChatApplication
         public async Task SendMessage(string socketId, string message)
         {
             await InvokeClientMethodToAllAsync("receiveMessage", socketId, message);
+        }
+
+        public string Ping()
+        {
+            return "Pong";
         }
 
         public override async Task OnDisconnected(WebSocket socket)

@@ -1,13 +1,9 @@
-﻿using Newtonsoft.Json;
-
-namespace WebSocketManager.Common
+﻿namespace WebSocketManager.Common
 {
-    public class InvocationDescriptor
+    public class InvocationDescriptor : InvocationMessage
     {
-        [JsonProperty("methodName")]
         public string MethodName { get; set; }
 
-        [JsonPropertyAttribute("arguments")]
         public object[] Arguments { get; set; }
     }
 }

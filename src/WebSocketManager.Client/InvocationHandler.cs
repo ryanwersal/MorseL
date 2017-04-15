@@ -2,7 +2,7 @@
 
 namespace WebSocketManager.Client
 {
-    public class InvocationHandler
+    internal struct InvocationHandler
     {
         public Action<object[]> Handler { get; set; }
         public Type[] ParameterTypes { get; set; }

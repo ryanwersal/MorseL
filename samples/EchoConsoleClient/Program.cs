@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Diagnostics;
 using System.Threading.Tasks;
 using WebSocketManager.Client;
 
@@ -21,7 +22,14 @@ public class Program
             var line = Console.ReadLine();
             if (line == "/quit" || line == "/exit") break;
 
-            SendMessage(line);
+            if (line == "/ping")
+            {
+                Ping();
+            }
+            else
+            {
+                SendMessage(line);
+            }
         }
 
         StopConnectionAsync();
@@ -30,16 +38,22 @@ public class Program
     public static async Task StartConnectionAsync()
     {
         _connection = new Connection();
-        await _connection.StartConnectionAsync("ws://localhost:65110/chat");
+        await _connection.StartAsync(new Uri("ws://localhost:65110/chat"));
     }
 
     public static async Task StopConnectionAsync()
     {
-        await _connection.StopConnectionAsync();
+        await _connection.DisposeAsync();
     }
 
     public static async Task SendMessage(string message)
     {
-        await _connection.Invoke("SendMessage", _connection.ConnectionId, message);
+        await _connection.Invoke<object>("SendMessage", _connection.ConnectionId, message);
+    }
+
+    public static async Task Ping()
+    {
+        var result = await _connection.Invoke<string>("Ping");
+        Debug.WriteLine(result);
     }
 }
