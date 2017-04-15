@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Concurrent;
+using System.Collections.Generic;
 using System.Linq;
 using System.Net.WebSockets;
 using System.Threading;
@@ -16,9 +17,9 @@ namespace WebSocketManager
             return _sockets.FirstOrDefault(p => p.Key == id).Value;
         }
 
-        public ConcurrentDictionary<string, WebSocket> GetAll()
+        public ICollection<WebSocket> GetAll()
         {
-            return _sockets;
+            return _sockets.Values;
         }
 
         public string GetId(WebSocket socket)

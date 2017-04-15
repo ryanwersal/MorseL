@@ -5,7 +5,7 @@ using WebSocketManager.Common;
 
 namespace ChatApplication
 {
-    public class ChatHandler : WebSocketHandler
+    public class ChatHandler : Hub
     {
         public ChatHandler(WebSocketConnectionManager webSocketConnectionManager) : base(webSocketConnectionManager)
         {}
@@ -22,12 +22,12 @@ namespace ChatApplication
                 Data = $"{socketId} is now connected"
             };
 
-            await SendMessageToAllAsync(message);
+            await Clients.All.SendMessageAsync(message);
         }
 
         public async Task SendMessage(string socketId, string message)
         {
-            await InvokeClientMethodToAllAsync("receiveMessage", socketId, message);
+            await Clients.All.InvokeAsync("receiveMessage", socketId, message);
         }
 
         public string Ping()

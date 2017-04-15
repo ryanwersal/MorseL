@@ -13,7 +13,8 @@ namespace WebSocketManager
 
             foreach (var type in Assembly.GetEntryAssembly().ExportedTypes)
             {
-                if (type.GetTypeInfo().BaseType == typeof(WebSocketHandler))
+                var baseType = type.GetTypeInfo().BaseType;
+                if (baseType == typeof(WebSocketHandler) || baseType == typeof(Hub))
                 {
                     services.AddSingleton(type);
                 }
