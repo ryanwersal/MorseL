@@ -56,7 +56,7 @@ namespace WebSocketManager.Client
                         HandleInvokeResult(resultDescriptor);
                         break;
                 }
-            });
+            }).ConfigureAwait(false);
         }
 
         public void On(string methodName, Type[] types, Action<object[]> handler)
@@ -146,7 +146,6 @@ namespace WebSocketManager.Client
                         case WebSocketMessageType.Binary:
                             // TODO: Implement.
                             throw new NotImplementedException("Binary messages not supported.");
-                            break;
 
                         case WebSocketMessageType.Text:
                             var serializedMessage = await receivedMessage.ToStringAsync().ConfigureAwait(false);

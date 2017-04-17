@@ -24,15 +24,15 @@ public class Program
 
             if (line == "/ping")
             {
-                Ping();
+                Ping().Wait();
             }
             else
             {
-                SendMessage(line);
+                SendMessage(line).Wait();
             }
         }
 
-        StopConnectionAsync();
+        StopConnectionAsync().Wait();
     }
 
     public static async Task StartConnectionAsync()

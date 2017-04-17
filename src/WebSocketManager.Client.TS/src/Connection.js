@@ -1,10 +1,10 @@
 "use strict";
-var InvocationDescriptor_1 = require("./InvocationDescriptor");
-var Message_1 = require("./Message");
+var InvocationDescriptor_1 = require('./InvocationDescriptor');
+var Message_1 = require('./Message');
 var Connection = (function () {
     function Connection(url, enableLogging) {
-        if (enableLogging === void 0) { enableLogging = false; }
         var _this = this;
+        if (enableLogging === void 0) { enableLogging = false; }
         this.enableLogging = false;
         this.clientMethods = {};
         this.connectionMethods = {};
@@ -34,17 +34,17 @@ var Connection = (function () {
         };
         this.socket.onmessage = function (event) {
             _this.message = JSON.parse(event.data);
-            if (_this.message.messageType == Message_1.MessageType.Text) {
+            if (_this.message.MessageType == Message_1.MessageType.Text) {
                 if (_this.enableLogging) {
-                    console.log('Text message received. Message: ' + _this.message.data);
+                    console.log('Text message received. Message: ' + _this.message.Data);
                 }
             }
-            else if (_this.message.messageType == Message_1.MessageType.MethodInvocation) {
-                var invocationDescriptor = JSON.parse(_this.message.data);
-                _this.clientMethods[invocationDescriptor.methodName].apply(_this, invocationDescriptor.arguments);
+            else if (_this.message.MessageType == Message_1.MessageType.MethodInvocation) {
+                var invocationDescriptor = JSON.parse(_this.message.Data);
+                _this.clientMethods[invocationDescriptor.MethodName].apply(_this, invocationDescriptor.Arguments);
             }
-            else if (_this.message.messageType == Message_1.MessageType.ConnectionEvent) {
-                _this.connectionId = _this.message.data;
+            else if (_this.message.MessageType == Message_1.MessageType.ConnectionEvent) {
+                _this.connectionId = _this.message.Data;
                 _this.connectionMethods['onConnected'].apply(_this);
             }
         };

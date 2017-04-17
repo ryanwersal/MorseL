@@ -3,10 +3,9 @@ using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Net.WebSockets;
-using System.Threading;
 using System.Threading.Tasks;
 
-namespace WebSocketManager
+namespace WebSocketManager.Sockets
 {
     public class WebSocketConnectionManager
     {
@@ -19,7 +18,7 @@ namespace WebSocketManager
 
         public Connection GetConnection(WebSocket socket)
         {
-            return _connections.FirstOrDefault(p => p.Value.Socket == socket).Value;
+            return _connections.FirstOrDefault(p => ((WebSocketChannel)p.Value.Socket).Socket == socket).Value;
         }
 
         public ICollection<Connection> GetAll()
@@ -34,7 +33,7 @@ namespace WebSocketManager
 
         public string GetId(WebSocket socket)
         {
-            return _connections.FirstOrDefault(p => p.Value.Socket == socket).Key;
+            return _connections.FirstOrDefault(p => ((WebSocketChannel)p.Value.Socket).Socket == socket).Key;
         }
 
         public Connection AddSocket(WebSocket socket)

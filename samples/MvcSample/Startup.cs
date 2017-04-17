@@ -1,7 +1,7 @@
 ﻿using System;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.Extensions.DependencyInjection;
-using MvcSample.MessageHandlers;
+using MvcSample.Hubs;
 using WebSocketManager;
 
 namespace MvcSample
@@ -21,7 +21,7 @@ namespace MvcSample
                 );
             });
 
-            app.MapWebSocketManagerHub<NotificationsMessageHandler>("/notifications");
+            app.MapWebSocketManagerHub<NotificationsMessageHub>("/notifications");
         }
 
         public void ConfigureServices(IServiceCollection services)

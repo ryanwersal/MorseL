@@ -1,4 +1,6 @@
+using System.Net.WebSockets;
 using System.Threading.Tasks;
+using WebSocketManager.Sockets;
 using WebSocketManager.Tests.Helpers;
 using Xunit;
 
@@ -34,7 +36,7 @@ namespace WebSocketManager.Tests
                 _manager.AddSocket(socket);
                 var id = _manager.GetId(socket);
 
-                Assert.Same(socket, _manager.GetConnectionById(id));
+                Assert.Same(socket, ((WebSocketChannel)_manager.GetConnectionById(id).Socket).Socket);
             }
         }
 
@@ -60,7 +62,7 @@ namespace WebSocketManager.Tests
             [Fact]
             public void WhenNull_ShouldReturnNull()
             {
-                var id = _manager.GetId(null);
+                var id = _manager.GetId((WebSocket)null);
 
                 Assert.Null(id);
             }

@@ -5,6 +5,6 @@ export enum MessageType {
 }
 
 export class Message {
-    public messageType: MessageType;
-    public data: string;
+    public MessageType: MessageType;
+    public Data: string;
 }

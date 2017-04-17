@@ -1,22 +1,22 @@
 ﻿using System.Threading.Tasks;
 using Microsoft.AspNetCore.Mvc;
-using MvcSample.MessageHandlers;
+using MvcSample.Hubs;
 
 namespace MvcSample.Controllers
 {
     public class MessagesController : Controller
     {
-        private NotificationsMessageHandler _notificationsMessageHandler { get; set; }
+        private NotificationsMessageHub NotificationsMessageHub { get; set; }
 
-        public MessagesController(NotificationsMessageHandler notificationsMessageHandler)
+        public MessagesController(NotificationsMessageHub notificationsMessageHub)
         {
-            _notificationsMessageHandler = notificationsMessageHandler;
+            NotificationsMessageHub = notificationsMessageHub;
         }
 
         [HttpGet]
         public async Task SendMessage([FromQueryAttribute]string message)
         {
-            await _notificationsMessageHandler.InvokeClientMethodToAllAsync("receiveMessage", message);
+            await NotificationsMessageHub.Clients.All.InvokeAsync("receiveMessage", message);
         }
     }
 }

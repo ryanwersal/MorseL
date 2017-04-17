@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Text;
 using System.Threading.Tasks;
 using WebSocketManager.Common;
+using WebSocketManager.Sockets;
 
 namespace WebSocketManager
 {

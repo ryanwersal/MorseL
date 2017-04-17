@@ -6,6 +6,8 @@
 
   <ItemGroup>
     <Content Include="wwwroot\client.html" />
+    <Content Include="wwwroot\WebSocketManager.js" />
+    <Content Include="wwwroot\WebSocketManager.js.map" />
   </ItemGroup>
 
   <ItemGroup>

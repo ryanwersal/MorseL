@@ -47,20 +47,20 @@ export class Connection {
         this.socket.onmessage = (event: MessageEvent) => {
             this.message = JSON.parse(event.data);
 
-            if (this.message.messageType == MessageType.Text) {
+            if (this.message.MessageType == MessageType.Text) {
                 if(this.enableLogging) {
-                    console.log('Text message received. Message: ' + this.message.data);
+                    console.log('Text message received. Message: ' + this.message.Data);
                 }
             }
 
-            else if (this.message.messageType == MessageType.MethodInvocation) {
-                let invocationDescriptor: InvocationDescriptor = JSON.parse(this.message.data);
+            else if (this.message.MessageType == MessageType.MethodInvocation) {
+                let invocationDescriptor: InvocationDescriptor = JSON.parse(this.message.Data);
 
-                this.clientMethods[invocationDescriptor.methodName].apply(this, invocationDescriptor.arguments);
+                this.clientMethods[invocationDescriptor.MethodName].apply(this, invocationDescriptor.Arguments);
             }
 
-            else if (this.message.messageType == MessageType.ConnectionEvent) {
-                this.connectionId = this.message.data;
+            else if (this.message.MessageType == MessageType.ConnectionEvent) {
+                this.connectionId = this.message.Data;
                 this.connectionMethods['onConnected'].apply(this);
             }
         }

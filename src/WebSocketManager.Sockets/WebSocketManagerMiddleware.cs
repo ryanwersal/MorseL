@@ -5,57 +5,57 @@ using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Http;
+using Microsoft.Extensions.DependencyInjection;
 
-namespace WebSocketManager
+namespace WebSocketManager.Sockets
 {
     public class WebSocketManagerMiddleware
     {
         private readonly RequestDelegate _next;
-        private Type _handlerType { get; }
+        private Type HandlerType { get; }
 
         public WebSocketManagerMiddleware(RequestDelegate next, Type handlerType)
         {
             _next = next;
-            _handlerType = handlerType;
+            HandlerType = handlerType;
         }
 
         public async Task Invoke(HttpContext context)
         {
             if (!context.WebSockets.IsWebSocketRequest) return;
 
-            var handler = context.RequestServices.GetService(_handlerType) as Hub;
+            var handler = ActivatorUtilities.CreateInstance(context.RequestServices, HandlerType) as WebSocketHandler;
             if (handler == null)
             {
                 throw new Exception("Invalid handler type specified. Must be a Hub.");
             }
 
             var socket = await context.WebSockets.AcceptWebSocketAsync().ConfigureAwait(false);
-            await handler.OnConnected(socket).ConfigureAwait(false);
 
-            await Receive(socket, async (result, serializedInvocationDescriptor) =>
+            await handler.OnConnected(socket, context).ConfigureAwait(false);
+
+            try
             {
-                if (result.MessageType == WebSocketMessageType.Text)
+                await Receive(socket, async (result, serializedInvocationDescriptor) =>
                 {
-                    await handler.ReceiveAsync(socket, result, serializedInvocationDescriptor).ConfigureAwait(false);
-                    return;
-                }
-
-                else if (result.MessageType == WebSocketMessageType.Close)
-                {
-                    try
+                    if (result.MessageType == WebSocketMessageType.Text)
                     {
-                        await handler.OnDisconnected(socket);
+                        await handler.ReceiveAsync(socket, result, serializedInvocationDescriptor).ConfigureAwait(false);
                     }
-
-                    catch (WebSocketException)
+                    else if (result.MessageType == WebSocketMessageType.Close)
                     {
-                        throw; //let's not swallow any exception for now
+                        await handler.OnDisconnected(socket, null);
                     }
-
-                    return;
-                }
-
-            });
+                });
+            }
+            catch (WebSocketException)
+            {
+                throw;
+            }
+            catch (Exception exception)
+            {
+                await handler.OnDisconnected(socket, exception);
+            }
 
             //TODO - investigate the Kestrel exception thrown when this is the last middleware
             //await _next.Invoke(context);

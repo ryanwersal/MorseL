@@ -1,19 +1,14 @@
-﻿using System.Net.WebSockets;
-using System.Threading.Tasks;
+﻿using System.Threading.Tasks;
 using WebSocketManager;
 using WebSocketManager.Common;
+using WebSocketManager.Sockets;
 
-namespace ChatApplication
+namespace ChatApplication.Hubs
 {
-    public class ChatHandler : Hub
+    public class ChatHub : Hub
     {
-        public ChatHandler(WebSocketConnectionManager webSocketConnectionManager) : base(webSocketConnectionManager)
-        {}
-
-        public override async Task OnConnected(Connection connection)
+        public override async Task OnConnectedAsync(Connection connection)
         {
-            await base.OnConnected(connection);
-
             var message = new Message()
             {
                 MessageType = MessageType.Text,
@@ -33,10 +28,8 @@ namespace ChatApplication
             return "Pong";
         }
 
-        public override async Task OnDisconnected(Connection connection)
+        public async Task OnDisconnectedAsync(Connection connection)
         {
-            await base.OnDisconnected(connection);
-
             var message = new Message()
             {
                 MessageType = MessageType.Text,

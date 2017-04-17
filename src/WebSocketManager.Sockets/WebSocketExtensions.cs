@@ -6,7 +6,7 @@ using System.Threading.Tasks;
 using WebSocketManager.Common;
 using WebSocketManager.Common.Serialization;
 
-namespace WebSocketManager
+namespace WebSocketManager.Sockets
 {
     public static class WebSocketExtensions
     {
@@ -20,22 +20,6 @@ namespace WebSocketManager
             var bytes = Encoding.ASCII.GetBytes(serializedMessage);
             var data = new ArraySegment<byte>(bytes, 0, serializedMessage.Length);
             await socket.SendAsync(data, WebSocketMessageType.Text, true, CancellationToken.None).ConfigureAwait(false);
-        }
-
-        public static async Task InvokeClientMethodAsync(this WebSocket socket, string methodName, object[] args)
-        {
-            // TODO: Serializer settings?
-            var message = new Message()
-            {
-                MessageType = MessageType.ClientMethodInvocation,
-                Data = Json.SerializeObject(new InvocationDescriptor()
-                {
-                    MethodName = methodName,
-                    Arguments = args
-                })
-            };
-
-            await socket.SendMessageAsync(message).ConfigureAwait(false);
         }
     }
 }

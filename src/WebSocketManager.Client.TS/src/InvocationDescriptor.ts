@@ -1,9 +1,9 @@
 export class InvocationDescriptor {
-    public methodName: string;
-    public arguments: Array<any>;
+    public MethodName: string;
+    public Arguments: Array<any>;
 
     constructor(methodName: string, args: any[]) {
-        this.methodName = methodName;
-        this.arguments = args;
+        this.MethodName = methodName;
+        this.Arguments = args;
     }
 }

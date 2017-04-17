@@ -1,4 +1,5 @@
 ﻿using System;
+using ChatApplication.Hubs;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -11,7 +12,7 @@ namespace ChatApplication
         public void Configure(IApplicationBuilder app, IServiceProvider serviceProvider)
         {
             app.UseWebSockets();
-            app.MapWebSocketManagerHub<ChatHandler>("/chat");
+            app.MapWebSocketManagerHub<ChatHub>("/chat");
 
             app.UseStaticFiles();
         }

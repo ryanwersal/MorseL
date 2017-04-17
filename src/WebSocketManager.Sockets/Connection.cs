@@ -4,7 +4,7 @@ using System.Security.Claims;
 using System.Threading;
 using System.Threading.Tasks;
 
-namespace WebSocketManager
+namespace WebSocketManager.Sockets
 {
     public class Connection : IDisposable
     {
@@ -12,12 +12,12 @@ namespace WebSocketManager
         public ClaimsPrincipal User { get; set; }
 
         // TODO: Remove this and instead make connections transport-agnostic.
-        public WebSocket Socket { get; }
+        public IChannel Socket { get; }
 
         public Connection(string id, WebSocket socket)
         {
             Id = id;
-            Socket = socket;
+            Socket = new WebSocketChannel(socket);
             User = new ClaimsPrincipal();
         }
 
@@ -28,7 +28,7 @@ namespace WebSocketManager
 
         public async Task DisposeAsync()
         {
-            await Socket.CloseAsync(WebSocketCloseStatus.NormalClosure,
+            await ((WebSocketChannel)Socket).Socket.CloseAsync(WebSocketCloseStatus.NormalClosure,
                     "Closed by manager.",
                     CancellationToken.None)
                 .ConfigureAwait(false);

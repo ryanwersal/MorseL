@@ -1,8 +1,8 @@
 "use strict";
 var InvocationDescriptor = (function () {
     function InvocationDescriptor(methodName, args) {
-        this.methodName = methodName;
-        this.arguments = args;
+        this.MethodName = methodName;
+        this.Arguments = args;
     }
     return InvocationDescriptor;
 }());
