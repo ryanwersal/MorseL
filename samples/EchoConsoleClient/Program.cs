@@ -9,7 +9,7 @@ public class Program
 
     public static void Main(string[] args)
     {
-        StartConnectionAsync();
+        var connectionTask = StartConnectionAsync();
 
         _connection.On("receiveMessage", new [] { typeof(string), typeof(string) }, (arguments) =>
         {
@@ -19,7 +19,7 @@ public class Program
         Console.WriteLine("// Type your message and hit Enter to send. Type '/quit' or '/exit' to close.");
         while (true)
         {
-            var line = Console.ReadLine();
+            var line = Console.In.ReadLineAsync().Result;
             if (line == "/quit" || line == "/exit") break;
 
             if (line == "/ping")

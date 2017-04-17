@@ -6,6 +6,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.DependencyInjection;
+using WebSocketManager.Sockets.Internal;
 
 namespace WebSocketManager.Sockets
 {
@@ -36,6 +37,10 @@ namespace WebSocketManager.Sockets
 
             try
             {
+                // Jump onto the thread pool thread so blocking user code doesn't block the setup of the
+                // connection and transport
+                await AwaitableThreadPool.Yield();
+
                 await Receive(socket, async (result, serializedInvocationDescriptor) =>
                 {
                     if (result.MessageType == WebSocketMessageType.Text)
