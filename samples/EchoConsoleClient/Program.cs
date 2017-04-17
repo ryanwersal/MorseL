@@ -11,7 +11,7 @@ public class Program
     {
         StartConnectionAsync();
 
-        _connection.On("receiveMessage", (arguments) =>
+        _connection.On("receiveMessage", new [] { typeof(string), typeof(string) }, (arguments) =>
         {
             Console.WriteLine($"{arguments[0]} said: {arguments[1]}");
         });

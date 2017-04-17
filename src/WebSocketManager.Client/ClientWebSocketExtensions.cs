@@ -31,24 +31,22 @@ namespace WebSocketManager.Client
         {
             using (var stream = new MemoryStream(Encoding.UTF8.GetBytes(message)))
             {
-                int MAX_BUFFER_SIZE = 4096;
-                var offset = 0;
-                while (offset < stream.Length)
+                var MAX_BUFFER_SIZE = 4096;
+                var buffer = new byte[MAX_BUFFER_SIZE];
+
+                using (var bufferedStream = new BufferedStream(stream, MAX_BUFFER_SIZE))
                 {
-                    var count = Math.Min((int)stream.Length - offset, MAX_BUFFER_SIZE);
-
-                    using (var s = new MemoryStream())
+                    var moreToSend = true;
+                    do
                     {
-                        await stream.CopyToAsync(s, count, cancellationToken).ConfigureAwait(false);
-                        var buffer = s.ToArray();
+                        await bufferedStream.ReadAsync(buffer, 0, MAX_BUFFER_SIZE, cancellationToken);
+                        var segment = new ArraySegment<byte>(buffer, 0, MAX_BUFFER_SIZE);
 
-                        var segment = new ArraySegment<byte>(buffer, offset, count);
-                        var endOfMessage = count <= MAX_BUFFER_SIZE;
+                        moreToSend = bufferedStream.Position < bufferedStream.Length;
 
-                        await socket.SendAsync(segment, WebSocketMessageType.Text, endOfMessage, cancellationToken)
-                            .ConfigureAwait(false);
-                        offset += segment.Count;
-                    }
+                        await socket.SendAsync(segment, WebSocketMessageType.Text,
+                            !moreToSend, cancellationToken).ConfigureAwait(false);
+                    } while (moreToSend);
                 }
             }
         }

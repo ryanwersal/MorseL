@@ -9,25 +9,23 @@ namespace WebSocketManager
     {
         public static IServiceCollection AddWebSocketManager(this IServiceCollection services)
         {
-            services.AddTransient<WebSocketConnectionManager>();
+            services.AddSingleton<WebSocketConnectionManager>();
 
             foreach (var type in Assembly.GetEntryAssembly().ExportedTypes)
             {
-                var baseType = type.GetTypeInfo().BaseType;
-                if (baseType == typeof(WebSocketHandler) || baseType == typeof(Hub))
+                if (type.GetTypeInfo().BaseType == typeof(Hub))
                 {
-                    services.AddSingleton(type);
+                    services.AddTransient(type);
                 }
             }
 
             return services;
         }
 
-        public static IApplicationBuilder MapWebSocketManager(this IApplicationBuilder app,
-                                                              PathString path,
-                                                              WebSocketHandler handler)
+        public static IApplicationBuilder MapWebSocketManagerHub<T>(
+            this IApplicationBuilder app, PathString path) where T : Hub
         {
-            return app.Map(path, (_app) => _app.UseMiddleware<WebSocketManagerMiddleware>(handler));
+            return app.Map(path, _app => _app.UseMiddleware<WebSocketManagerMiddleware>(typeof(T)));
         }
     }
 }

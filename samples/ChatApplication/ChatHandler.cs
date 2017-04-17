@@ -10,16 +10,14 @@ namespace ChatApplication
         public ChatHandler(WebSocketConnectionManager webSocketConnectionManager) : base(webSocketConnectionManager)
         {}
 
-        public override async Task OnConnected(WebSocket socket)
+        public override async Task OnConnected(Connection connection)
         {
-            await base.OnConnected(socket);
-
-            var socketId = WebSocketConnectionManager.GetId(socket);
+            await base.OnConnected(connection);
 
             var message = new Message()
             {
                 MessageType = MessageType.Text,
-                Data = $"{socketId} is now connected"
+                Data = $"{connection.Id} is now connected"
             };
 
             await Clients.All.SendMessageAsync(message);
@@ -35,18 +33,17 @@ namespace ChatApplication
             return "Pong";
         }
 
-        public override async Task OnDisconnected(WebSocket socket)
+        public override async Task OnDisconnected(Connection connection)
         {
-            var socketId = WebSocketConnectionManager.GetId(socket);
-
-            await base.OnDisconnected(socket);
+            await base.OnDisconnected(connection);
 
             var message = new Message()
             {
                 MessageType = MessageType.Text,
-                Data = $"{socketId} disconnected"
+                Data = $"{connection.Id} disconnected"
             };
-            await SendMessageToAllAsync(message);
+
+            await Clients.All.SendMessageAsync(message);
         }
     }
 }

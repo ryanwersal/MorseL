@@ -11,28 +11,32 @@ namespace WebSocketManager
     public class WebSocketManagerMiddleware
     {
         private readonly RequestDelegate _next;
-        private WebSocketHandler _webSocketHandler { get; set; }
+        private Type _handlerType { get; }
 
-        public WebSocketManagerMiddleware(RequestDelegate next,
-                                          WebSocketHandler webSocketHandler)
+        public WebSocketManagerMiddleware(RequestDelegate next, Type handlerType)
         {
             _next = next;
-            _webSocketHandler = webSocketHandler;
+            _handlerType = handlerType;
         }
 
         public async Task Invoke(HttpContext context)
         {
-            if (!context.WebSockets.IsWebSocketRequest)
-                return;
+            if (!context.WebSockets.IsWebSocketRequest) return;
+
+            var handler = context.RequestServices.GetService(_handlerType) as Hub;
+            if (handler == null)
+            {
+                throw new Exception("Invalid handler type specified. Must be a Hub.");
+            }
 
             var socket = await context.WebSockets.AcceptWebSocketAsync().ConfigureAwait(false);
-            await _webSocketHandler.OnConnected(socket).ConfigureAwait(false);
+            await handler.OnConnected(socket).ConfigureAwait(false);
 
             await Receive(socket, async (result, serializedInvocationDescriptor) =>
             {
                 if (result.MessageType == WebSocketMessageType.Text)
                 {
-                    await _webSocketHandler.ReceiveAsync(socket, result, serializedInvocationDescriptor).ConfigureAwait(false);
+                    await handler.ReceiveAsync(socket, result, serializedInvocationDescriptor).ConfigureAwait(false);
                     return;
                 }
 
@@ -40,7 +44,7 @@ namespace WebSocketManager
                 {
                     try
                     {
-                        await _webSocketHandler.OnDisconnected(socket);
+                        await handler.OnDisconnected(socket);
                     }
 
                     catch (WebSocketException)

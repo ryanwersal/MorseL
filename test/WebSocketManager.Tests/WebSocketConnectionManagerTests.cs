@@ -21,7 +21,7 @@ namespace WebSocketManager.Tests
             [InlineData("foo")]
             public void WhenNonExistentId_ShouldReturnNull(string id)
             {
-                var socket = _manager.GetSocketById(id);
+                var socket = _manager.GetConnectionById(id);
 
                 Assert.Null(socket);
             }
@@ -34,7 +34,7 @@ namespace WebSocketManager.Tests
                 _manager.AddSocket(socket);
                 var id = _manager.GetId(socket);
 
-                Assert.Same(socket, _manager.GetSocketById(id));
+                Assert.Same(socket, _manager.GetConnectionById(id));
             }
         }
 
@@ -112,7 +112,7 @@ namespace WebSocketManager.Tests
             [InlineData("foo")]
             public async Task WhenNonExistentId_ShouldNotThrowException(string id)
             {
-                await _manager.RemoveSocket(id);
+                await _manager.RemoveConnection(id);
             }
         }
     }

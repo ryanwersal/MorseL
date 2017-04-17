@@ -1,8 +1,8 @@
 ﻿using System;
 
-namespace WebSocketManager.Client
+namespace WebSocketManager.Common
 {
-    internal struct InvocationHandler
+    public struct InvocationHandler
     {
         public Action<object[]> Handler { get; set; }
         public Type[] ParameterTypes { get; set; }

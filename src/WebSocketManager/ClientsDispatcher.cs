@@ -39,28 +39,35 @@ namespace WebSocketManager
             All = new ClientInvoker(
                 async (methodName, args) =>
                 {
-                    foreach (var socket in Manager.GetAll())
+                    foreach (var connection in Manager.GetAll())
                     {
-                        await socket.InvokeClientMethodAsync(methodName, args).ConfigureAwait(false);
+                        await connection.Socket.InvokeClientMethodAsync(methodName, args).ConfigureAwait(false);
                     }
                 },
                 async msg =>
                 {
-                    foreach (var socket in Manager.GetAll())
+                    foreach (var connection in Manager.GetAll())
                     {
-                        await socket.SendMessageAsync(msg).ConfigureAwait(false);
+                        await connection.Socket.SendMessageAsync(msg).ConfigureAwait(false);
                     }
                 });
         }
 
         public IClientInvoker All { get; }
 
+        public IClientInvoker Group(string groupId)
+        {
+            return new ClientInvoker(
+                (methodName, args) => Task.CompletedTask,
+                msg => Task.CompletedTask);
+        }
+
         public IClientInvoker Client(string connectionId)
         {
-            var socket = Manager.GetSocketById(connectionId);
+            var connection = Manager.GetConnectionById(connectionId);
             return new ClientInvoker(
-                async (methodName, args) => await socket.InvokeClientMethodAsync(methodName, args).ConfigureAwait(false),
-                async msg => await socket.SendMessageAsync(msg).ConfigureAwait(false));
+                async (methodName, args) => await connection.Socket.InvokeClientMethodAsync(methodName, args).ConfigureAwait(false),
+                async msg => await connection.Socket.SendMessageAsync(msg).ConfigureAwait(false));
         }
     }
 }

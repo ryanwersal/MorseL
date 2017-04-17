@@ -4,10 +4,8 @@ using System.Collections.Generic;
 using System.Net.WebSockets;
 using System.Threading;
 using System.Threading.Tasks;
-using Newtonsoft.Json;
-using Newtonsoft.Json.Serialization;
-
 using WebSocketManager.Common;
+using WebSocketManager.Common.Serialization;
 
 namespace WebSocketManager.Client
 {
@@ -15,11 +13,8 @@ namespace WebSocketManager.Client
     {
         public string ConnectionId { get; set; }
 
-        private ClientWebSocket _clientWebSocket { get; set; }
-        private JsonSerializerSettings _jsonSerializerSettings = new JsonSerializerSettings()
-        {
-            ContractResolver = new CamelCasePropertyNamesContractResolver()
-        };
+        private ClientWebSocket _clientWebSocket { get; }
+        private string Name { get; }
 
         private int _nextId = 0;
 
@@ -27,30 +22,23 @@ namespace WebSocketManager.Client
         private readonly Dictionary<string, InvocationRequest> _pendingCalls = new Dictionary<string, InvocationRequest>();
         private readonly ConcurrentDictionary<string, InvocationHandler> _handlers = new ConcurrentDictionary<string, InvocationHandler>();
 
-        // TODO: Implement.
-        public event Action Connected
-        {
-            add {  }
-            remove {  }
-        }
+        public event Action Connected;
+        public event Action<Exception> Closed;
 
-        // TODO: Implement.
-        public event Action<Exception> Closed
+        public Connection(string name = null, Action<ClientWebSocketOptions> optionConfigAction = null)
         {
-            add {  }
-            remove {  }
-        }
-
-        public Connection()
-        {
+            Name = name;
             _clientWebSocket = new ClientWebSocket();
+            optionConfigAction?.Invoke(_clientWebSocket.Options);
         }
 
         public async Task StartAsync(Uri uri)
         {
             await _clientWebSocket.ConnectAsync(uri, CancellationToken.None).ConfigureAwait(false);
 
-            await Receive(message =>
+            Connected?.Invoke();
+
+            Receive(message =>
             {
                 switch (message.MessageType)
                 {
@@ -59,24 +47,21 @@ namespace WebSocketManager.Client
                         break;
 
                     case MessageType.ClientMethodInvocation:
-                        var invocationDescriptor = JsonConvert.DeserializeObject<InvocationDescriptor>(message.Data, _jsonSerializerSettings);
+                        var invocationDescriptor = Json.DeserializeInvocationDescriptor(message.Data, _handlers);
                         InvokeOn(invocationDescriptor);
                         break;
 
                     case MessageType.InvocationResult:
-                        var resultDescriptor = JsonConvert.DeserializeObject<InvocationResultDescriptor>(message.Data, _jsonSerializerSettings);
+                        var resultDescriptor = Json.DeserializeInvocationResultDescriptor(message.Data, _pendingCalls);
                         HandleInvokeResult(resultDescriptor);
                         break;
                 }
             });
         }
 
-        // TODO: Implement.
-        public void On(string methodName, Type[] types, Action<object[]> handler) => On(methodName, handler);
-
-        public void On(string methodName, Action<object[]> handler)
+        public void On(string methodName, Type[] types, Action<object[]> handler)
         {
-            var invocationHandler = new InvocationHandler(handler, new Type[] { });
+            var invocationHandler = new InvocationHandler(handler, types);
             _handlers.AddOrUpdate(methodName, invocationHandler, (_, __) => invocationHandler);
         }
 
@@ -101,7 +86,7 @@ namespace WebSocketManager.Client
 
             try
             {
-                var message = JsonConvert.SerializeObject(descriptor, _jsonSerializerSettings);
+                var message = Json.SerializeObject(descriptor);
                 await _clientWebSocket.SendAllAsync(message, CancellationToken.None).ConfigureAwait(false);
             }
             catch (Exception e)
@@ -119,7 +104,7 @@ namespace WebSocketManager.Client
         private void InvokeOn(InvocationDescriptor descriptor)
         {
             var invocationHandler = _handlers[descriptor.MethodName];
-            invocationHandler.Handler(descriptor.Arguments);
+            Task.Run(() => invocationHandler.Handler(descriptor.Arguments));
         }
 
         private void HandleInvokeResult(InvocationResultDescriptor descriptor)
@@ -145,6 +130,7 @@ namespace WebSocketManager.Client
 
         public async Task DisposeAsync()
         {
+            if (_clientWebSocket.State != WebSocketState.Open) return;
             await _clientWebSocket.CloseOutputAsync(WebSocketCloseStatus.NormalClosure, "", CancellationToken.None).ConfigureAwait(false);
         }
 
@@ -164,7 +150,7 @@ namespace WebSocketManager.Client
 
                         case WebSocketMessageType.Text:
                             var serializedMessage = await receivedMessage.ToStringAsync().ConfigureAwait(false);
-                            var message = JsonConvert.DeserializeObject<Message>(serializedMessage);
+                            var message = Json.Deserialize<Message>(serializedMessage);
                             handleMessage(message);
                             break;
 

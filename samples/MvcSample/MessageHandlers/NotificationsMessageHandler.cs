@@ -2,7 +2,7 @@
 
 namespace MvcSample.MessageHandlers
 {
-    public class NotificationsMessageHandler : WebSocketHandler
+    public class NotificationsMessageHandler : Hub
     {
         public NotificationsMessageHandler(WebSocketConnectionManager webSocketConnectionManager) : base(webSocketConnectionManager)
         {

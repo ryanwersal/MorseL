@@ -11,7 +11,7 @@ namespace ChatApplication
         public void Configure(IApplicationBuilder app, IServiceProvider serviceProvider)
         {
             app.UseWebSockets();
-            app.MapWebSocketManager("/chat", serviceProvider.GetService<ChatHandler>());
+            app.MapWebSocketManagerHub<ChatHandler>("/chat");
 
             app.UseStaticFiles();
         }

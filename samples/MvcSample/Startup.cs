@@ -21,7 +21,7 @@ namespace MvcSample
                 );
             });
 
-            app.MapWebSocketManager("/notifications", serviceProvider.GetService<NotificationsMessageHandler>());
+            app.MapWebSocketManagerHub<NotificationsMessageHandler>("/notifications");
         }
 
         public void ConfigureServices(IServiceCollection services)
