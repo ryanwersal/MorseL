@@ -2,10 +2,15 @@
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Net.WebSockets;
+using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
+using AsyncWebSocketClient;
+using SuperSocket.ClientEngine;
 using WebSocketManager.Common;
 using WebSocketManager.Common.Serialization;
+using WebSocketMessageType = AsyncWebSocketClient.WebSocketMessageType;
+using WebSocketState = WebSocket4Net.WebSocketState;
 
 namespace WebSocketManager.Client
 {
@@ -13,7 +18,7 @@ namespace WebSocketManager.Client
     {
         public string ConnectionId { get; set; }
 
-        private ClientWebSocket _clientWebSocket { get; }
+        private WebSocketClient _clientWebSocket { get; }
         private string Name { get; }
 
         private int _nextId = 0;
@@ -25,20 +30,20 @@ namespace WebSocketManager.Client
         public event Action Connected;
         public event Action<Exception> Closed;
 
-        public Connection(string name = null, Action<ClientWebSocketOptions> optionConfigAction = null)
+        public Connection(string name = null, Action<SecurityOption> optionConfigAction = null)
         {
             Name = name;
-            _clientWebSocket = new ClientWebSocket();
-            optionConfigAction?.Invoke(_clientWebSocket.Options);
+            _clientWebSocket = new WebSocketClient();
+            optionConfigAction?.Invoke(_clientWebSocket.Security);
         }
 
-        public async Task StartAsync(Uri uri)
+        public async Task StartAsync(string uri)
         {
-            await _clientWebSocket.ConnectAsync(uri, CancellationToken.None).ConfigureAwait(false);
+            await _clientWebSocket.ConnectAsync(uri, cts: CancellationToken.None).ConfigureAwait(false);
 
             Connected?.Invoke();
 
-            await Task.Factory.StartNew(async () =>
+            await Receive(message =>
             {
                 try
                 {
@@ -100,7 +105,7 @@ namespace WebSocketManager.Client
             try
             {
                 var message = Json.SerializeObject(descriptor);
-                await _clientWebSocket.SendAllAsync(message, CancellationToken.None).ConfigureAwait(false);
+                await _clientWebSocket.SendAsync(message, CancellationToken.None).ConfigureAwait(false);
             }
             catch (Exception e)
             {
@@ -144,36 +149,34 @@ namespace WebSocketManager.Client
         public async Task DisposeAsync()
         {
             if (_clientWebSocket.State != WebSocketState.Open) return;
-            await _clientWebSocket.CloseOutputAsync(WebSocketCloseStatus.NormalClosure, "", CancellationToken.None).ConfigureAwait(false);
+            await _clientWebSocket.DisconnectAsync(CancellationToken.None).ConfigureAwait(false);
+            Closed?.Invoke(null);
         }
 
         private async Task Receive(Action<Message> handleMessage)
         {
             while (_clientWebSocket.State == WebSocketState.Open)
             {
-                using (var receivedMessage = await _clientWebSocket.ReceiveAllAsync(CancellationToken.None)
-                    .ConfigureAwait(false))
+                var receivedMessage = await _clientWebSocket.RecieveAsync(CancellationToken.None).ConfigureAwait(false);
+                switch (receivedMessage.MessageType)
                 {
-                    switch (receivedMessage.MessageType)
-                    {
-                        case WebSocketMessageType.Binary:
-                            // TODO: Implement.
-                            throw new NotImplementedException("Binary messages not supported.");
+                    case WebSocketMessageType.Binary:
+                        // TODO: Implement.
+                        throw new NotImplementedException("Binary messages not supported.");
 
-                        case WebSocketMessageType.Text:
-                            var serializedMessage = await receivedMessage.ToStringAsync().ConfigureAwait(false);
-                            var message = Json.Deserialize<Message>(serializedMessage);
-                            handleMessage(message);
-                            break;
+                    case WebSocketMessageType.Text:
+                        var serializedMessage = Encoding.UTF8.GetString(receivedMessage.Data);
+                        var message = Json.Deserialize<Message>(serializedMessage);
+                        handleMessage(message);
+                        break;
 
-                        case WebSocketMessageType.Close:
-                            await _clientWebSocket
-                                .CloseOutputAsync(WebSocketCloseStatus.NormalClosure, "", CancellationToken.None)
-                                .ConfigureAwait(false);
-                            break;
-                        default:
-                            throw new ArgumentOutOfRangeException();
-                    }
+                    case WebSocketMessageType.Close:
+                        await _clientWebSocket
+                            .DisconnectAsync(CancellationToken.None)
+                            .ConfigureAwait(false);
+                        break;
+                    default:
+                        throw new ArgumentOutOfRangeException();
                 }
             }
         }

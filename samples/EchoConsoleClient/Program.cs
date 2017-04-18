@@ -38,7 +38,7 @@ public class Program
     public static async Task StartConnectionAsync()
     {
         _connection = new Connection();
-        await _connection.StartAsync(new Uri("ws://localhost:65110/chat"));
+        await _connection.StartAsync("wss://localhost:5001/chat");
     }
 
     public static async Task StopConnectionAsync()

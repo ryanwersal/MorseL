@@ -15,6 +15,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\AsyncWebSocketClient\AsyncWebSocketClient.csproj" />
     <ProjectReference Include="..\WebSocketManager.Common\WebSocketManager.Common.csproj" />
   </ItemGroup>
 
