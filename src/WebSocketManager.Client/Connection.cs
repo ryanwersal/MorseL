@@ -38,25 +38,38 @@ namespace WebSocketManager.Client
 
             Connected?.Invoke();
 
-            Receive(message =>
+            await Task.Factory.StartNew(async () =>
             {
-                switch (message.MessageType)
+                try
                 {
-                    case MessageType.ConnectionEvent:
-                        ConnectionId = message.Data;
-                        break;
+                    await Receive(message =>
+                    {
+                        switch (message.MessageType)
+                        {
+                            case MessageType.ConnectionEvent:
+                                ConnectionId = message.Data;
+                                break;
 
-                    case MessageType.ClientMethodInvocation:
-                        var invocationDescriptor = Json.DeserializeInvocationDescriptor(message.Data, _handlers);
-                        InvokeOn(invocationDescriptor);
-                        break;
+                            case MessageType.ClientMethodInvocation:
+                                var invocationDescriptor =
+                                    Json.DeserializeInvocationDescriptor(message.Data, _handlers);
+                                InvokeOn(invocationDescriptor);
+                                break;
 
-                    case MessageType.InvocationResult:
-                        var resultDescriptor = Json.DeserializeInvocationResultDescriptor(message.Data, _pendingCalls);
-                        HandleInvokeResult(resultDescriptor);
-                        break;
+                            case MessageType.InvocationResult:
+                                var resultDescriptor =
+                                    Json.DeserializeInvocationResultDescriptor(message.Data, _pendingCalls);
+                                HandleInvokeResult(resultDescriptor);
+                                break;
+                        }
+                    }).ConfigureAwait(false);
                 }
-            }).ConfigureAwait(false);
+                catch (Exception e)
+                {
+                    Console.WriteLine(e);
+                    throw;
+                }
+            }, CancellationToken.None, TaskCreationOptions.None, TaskScheduler.Default).ConfigureAwait(false);
         }
 
         public void On(string methodName, Type[] types, Action<object[]> handler)
