@@ -1,7 +1,6 @@
 ﻿using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
-using System.Net.WebSockets;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
@@ -9,6 +8,7 @@ using AsyncWebSocketClient;
 using SuperSocket.ClientEngine;
 using WebSocketManager.Common;
 using WebSocketManager.Common.Serialization;
+using WebSocketManager.Sockets.Internal;
 using WebSocketMessageType = AsyncWebSocketClient.WebSocketMessageType;
 using WebSocketState = WebSocket4Net.WebSocketState;
 
@@ -23,6 +23,9 @@ namespace WebSocketManager.Client
 
         private int _nextId = 0;
 
+        private readonly TaskCompletionSource<object> _taskCompletionSource = new TaskCompletionSource<object>(TaskCreationOptions.RunContinuationsAsynchronously);
+        private volatile Task _receiveLoopTask;
+
         private readonly object _pendingCallsLock = new object();
         private readonly Dictionary<string, InvocationRequest> _pendingCalls = new Dictionary<string, InvocationRequest>();
         private readonly ConcurrentDictionary<string, InvocationHandler> _handlers = new ConcurrentDictionary<string, InvocationHandler>();
@@ -30,51 +33,58 @@ namespace WebSocketManager.Client
         public event Action Connected;
         public event Action<Exception> Closed;
 
-        public Connection(string name = null, Action<SecurityOption> optionConfigAction = null)
+        public Connection(string uri, string name = null, Action<SecurityOption> securityConfig = null)
         {
             Name = name;
-            _clientWebSocket = new WebSocketClient();
-            optionConfigAction?.Invoke(_clientWebSocket.Security);
+            _clientWebSocket = new WebSocketClient(uri, securityConfig: securityConfig);
         }
 
-        public async Task StartAsync(string uri)
+        public Task StartAsync()
         {
-            await _clientWebSocket.ConnectAsync(uri, cts: CancellationToken.None).ConfigureAwait(false);
-
-            Connected?.Invoke();
-
-            await Receive(message =>
+            Task.Run(async () =>
             {
-                try
+                await _clientWebSocket.ConnectAsync().ConfigureAwait(false);
+
+                Connected?.Invoke();
+
+                _receiveLoopTask = Receive(message =>
                 {
-                    await Receive(message =>
+                    switch (message.MessageType)
                     {
-                        switch (message.MessageType)
-                        {
-                            case MessageType.ConnectionEvent:
-                                ConnectionId = message.Data;
-                                break;
+                        case MessageType.ConnectionEvent:
+                            ConnectionId = message.Data;
+                            break;
 
-                            case MessageType.ClientMethodInvocation:
-                                var invocationDescriptor =
-                                    Json.DeserializeInvocationDescriptor(message.Data, _handlers);
-                                InvokeOn(invocationDescriptor);
-                                break;
+                        case MessageType.ClientMethodInvocation:
+                            var invocationDescriptor = Json.DeserializeInvocationDescriptor(message.Data, _handlers);
+                            InvokeOn(invocationDescriptor);
+                            break;
 
-                            case MessageType.InvocationResult:
-                                var resultDescriptor =
-                                    Json.DeserializeInvocationResultDescriptor(message.Data, _pendingCalls);
-                                HandleInvokeResult(resultDescriptor);
-                                break;
-                        }
-                    }).ConfigureAwait(false);
-                }
-                catch (Exception e)
+                        case MessageType.InvocationResult:
+                            var resultDescriptor = Json.DeserializeInvocationResultDescriptor(message.Data,
+                                _pendingCalls);
+                            HandleInvokeResult(resultDescriptor);
+                            break;
+                    }
+                });
+
+            }).ContinueWith(task =>
+            {
+                if (task.IsFaulted)
                 {
-                    Console.WriteLine(e);
-                    throw;
+                    _taskCompletionSource.SetException(task.Exception.InnerException);
                 }
-            }, CancellationToken.None, TaskCreationOptions.None, TaskScheduler.Default).ConfigureAwait(false);
+                else if (task.IsCanceled)
+                {
+                    _taskCompletionSource.SetCanceled();
+                }
+                else
+                {
+                    _taskCompletionSource.SetResult(null);
+                }
+            });
+
+            return _taskCompletionSource.Task;
         }
 
         public void On(string methodName, Type[] types, Action<object[]> handler)
@@ -150,6 +160,12 @@ namespace WebSocketManager.Client
         {
             if (_clientWebSocket.State != WebSocketState.Open) return;
             await _clientWebSocket.DisconnectAsync(CancellationToken.None).ConfigureAwait(false);
+
+            if (_receiveLoopTask != null)
+            {
+                await _receiveLoopTask;
+            }
+
             Closed?.Invoke(null);
         }
 

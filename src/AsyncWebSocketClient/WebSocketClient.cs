@@ -5,6 +5,7 @@ using System.Security.Authentication;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
+using Nito.AsyncEx;
 using SuperSocket.ClientEngine;
 using WebSocket4Net;
 
@@ -12,77 +13,51 @@ namespace AsyncWebSocketClient
 {
     public class WebSocketClient
     {
-        private WebSocket _internalWebSocket;
-        private SecurityOption _security;
-        private Queue<WebSocketPacket> _packets = new Queue<WebSocketPacket>();
-        private ReaderWriterLockSlim _packetLock = new ReaderWriterLockSlim();
+        private readonly WebSocket _internalWebSocket;
+        private readonly AsyncProducerConsumerQueue<WebSocketPacket> _packets = new AsyncProducerConsumerQueue<WebSocketPacket>();
 
         public TimeSpan ConnectionTimeout = TimeSpan.FromSeconds(5);
+        public TimeSpan DisconnectionTimeout = TimeSpan.FromSeconds(5);
 
         public WebSocketState State => _internalWebSocket?.State ?? WebSocketState.None;
 
-        public SecurityOption Security
+        public WebSocketClient(string uri, string subProtocol = "", List<KeyValuePair<string, string>> cookies = null, List<KeyValuePair<string, string>> customHeaderItems = null, string userAgent = "", string origin = "", WebSocketVersion version = WebSocketVersion.None, EndPoint httpConnectProxy = null, SslProtocols sslProtocols = SslProtocols.None, int receiveBufferSize = 0, Action<SecurityOption> securityConfig = null)
         {
-            get
-            {
-                if (_internalWebSocket != null)
-                {
-                    return _internalWebSocket.Security;
-                }
-
-                return _security;
-            }
-            set
-            {
-                if (_internalWebSocket != null)
-                {
-                    throw new WebSocketClientException("Cannot be modified after ConnectAsync has been called.");
-                }
-
-                _security = value;
-            }
+            _internalWebSocket = new WebSocket(uri, subProtocol, cookies, customHeaderItems, userAgent, origin, version, httpConnectProxy, sslProtocols, receiveBufferSize);
+            securityConfig?.Invoke(_internalWebSocket.Security);
         }
 
-        public WebSocketClient() : this(new SecurityOption())
-        {
-        }
-
-        public WebSocketClient(SecurityOption security)
-        {
-            _security = security;
-        }
-
-        public Task ConnectAsync(string uri, string subProtocol = "", List<KeyValuePair<string, string>> cookies = null, List<KeyValuePair<string, string>> customHeaderItems = null, string userAgent = "", string origin = "", WebSocketVersion version = WebSocketVersion.None, EndPoint httpConnectProxy = null, SslProtocols sslProtocols = SslProtocols.None, int receiveBufferSize = 0, CancellationToken cts = default(CancellationToken))
+        public Task ConnectAsync(CancellationToken cts = default(CancellationToken))
         {
             var task = Task.Run(async () =>
             {
                 Exception exception = null;
-
-                _internalWebSocket = new WebSocket(uri, subProtocol, cookies, customHeaderItems, userAgent, origin, version, httpConnectProxy, sslProtocols, receiveBufferSize);
+                
                 _internalWebSocket.Error += (sender, args) =>
                 {
                     exception = args.Exception;
                 };
-                _internalWebSocket.DataReceived += (sender, args) =>
+                _internalWebSocket.DataReceived += async (sender, args) =>
                 {
-                    _packetLock.EnterWriteLock();
-                        _packets.Enqueue(new WebSocketPacket(WebSocketMessageType.Binary, args.Data));
-                    _packetLock.ExitWriteLock();
+                    await _packets.EnqueueAsync(new WebSocketPacket(WebSocketMessageType.Binary, args.Data), cts);
                 };
-                _internalWebSocket.MessageReceived += (sender, args) =>
+                _internalWebSocket.MessageReceived += async (sender, args) =>
                 {
-                    _packetLock.EnterWriteLock();
-                        _packets.Enqueue(new WebSocketPacket(WebSocketMessageType.Text, Encoding.UTF8.GetBytes(args.Message)));
-                    _packetLock.ExitWriteLock();
+                    await _packets.EnqueueAsync(new WebSocketPacket(WebSocketMessageType.Text, Encoding.UTF8.GetBytes(args.Message)), cts);
                 };
 
                 var connectTask = Task.Run(async () =>
                 {
                     _internalWebSocket.Open();
-                    while (_internalWebSocket.State == WebSocketState.None || _internalWebSocket.State == WebSocketState.Connecting) { await Task.Delay(100, cts); }
+                    while (!cts.IsCancellationRequested
+                           && (_internalWebSocket.State == WebSocketState.None
+                               || _internalWebSocket.State == WebSocketState.Connecting))
+                    {
+                        await Task.Delay(100, cts);
+                    }
                 }, cts);
 
-                await Task.WhenAny(connectTask, Task.Delay(ConnectionTimeout, cts)).ConfigureAwait(false);
+                await Task.WhenAny(connectTask, Task.Delay(DisconnectionTimeout, cts)).ConfigureAwait(false);
 
                 if (!connectTask.IsCompleted)
                 {
@@ -99,7 +74,7 @@ namespace AsyncWebSocketClient
             return task;
         }
 
-        public Task DisconnectAsync(CancellationToken cts)
+        public Task DisconnectAsync(CancellationToken cts = default(CancellationToken))
         {
             var task = Task.Run(async () =>
             {
@@ -107,7 +82,12 @@ namespace AsyncWebSocketClient
 
                 var closeTask = Task.Run(async () =>
                 {
-                    while (_internalWebSocket.State == WebSocketState.Open || _internalWebSocket.State == WebSocketState.Closing) { await Task.Delay(100, cts); }
+                    while (!cts.IsCancellationRequested
+                           && (_internalWebSocket.State == WebSocketState.Open
+                               || _internalWebSocket.State == WebSocketState.Closing))
+                    {
+                        await Task.Delay(100, cts);
+                    }
                 }, cts);
 
                 await Task.WhenAny(closeTask, Task.Delay(ConnectionTimeout, cts)).ConfigureAwait(false);
@@ -124,10 +104,7 @@ namespace AsyncWebSocketClient
 
         public Task SendAsync(string message, CancellationToken cts = default(CancellationToken))
         {
-            var task = Task.Run(() =>
-            {
-                _internalWebSocket.Send(message);
-            }, cts);
+            var task = Task.Run(() => _internalWebSocket.Send(message), cts);
             task.ConfigureAwait(false);
 
             return task;
@@ -135,10 +112,7 @@ namespace AsyncWebSocketClient
 
         public Task SendAsync(ArraySegment<byte> buffer, CancellationToken cts = default(CancellationToken))
         {
-            var task = Task.Run(() =>
-            {
-                _internalWebSocket.Send(new[] { buffer });
-            }, cts);
+            var task = Task.Run(() => _internalWebSocket.Send(new[] { buffer }), cts);
             task.ConfigureAwait(false);
 
             return task;
@@ -146,27 +120,7 @@ namespace AsyncWebSocketClient
 
         public Task<WebSocketPacket> RecieveAsync(CancellationToken cts = default(CancellationToken))
         {
-            var task = Task.Run(async () =>
-            {
-                WebSocketPacket packet;
-                while (true)
-                {
-                    while (_packets.Count == 0) { await Task.Delay(100, cts); }
-
-                    _packetLock.EnterWriteLock();
-                    try
-                    {
-                        if (_packets.Count == 0) continue;
-                        packet = _packets.Dequeue();
-                        break;
-                    }
-                    finally
-                    {
-                        _packetLock.ExitWriteLock();
-                    }
-                }
-                return packet;
-            }, cts);
+            var task = Task.Run(async () => await _packets.DequeueAsync(cts), cts);
             task.ConfigureAwait(false);
 
             return task;
