@@ -18,6 +18,7 @@ using Xunit;
 
 namespace WebSocketManager.Tests
 {
+    [Trait("Target", "Hubs")]
     public class HubTests
     {
         private int _nextId;

@@ -6,6 +6,7 @@ using Xunit;
 
 namespace WebSocketManager.Tests
 {
+    [Trait("Target", "WebSocketConnectionManager")]
     public class WebSocketConnectionManagerTests
     {
         private readonly WebSocketConnectionManager _manager;

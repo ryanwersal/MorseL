@@ -16,15 +16,26 @@ namespace AsyncWebSocketClient
         private readonly WebSocket _internalWebSocket;
         private readonly AsyncProducerConsumerQueue<WebSocketPacket> _packets = new AsyncProducerConsumerQueue<WebSocketPacket>();
 
-        public TimeSpan ConnectionTimeout = TimeSpan.FromSeconds(5);
-        public TimeSpan DisconnectionTimeout = TimeSpan.FromSeconds(5);
-
+        public WebSocketClientOption Options { get; }
+        public SecurityOption Security { get; }
         public WebSocketState State => _internalWebSocket?.State ?? WebSocketState.None;
 
-        public WebSocketClient(string uri, string subProtocol = "", List<KeyValuePair<string, string>> cookies = null, List<KeyValuePair<string, string>> customHeaderItems = null, string userAgent = "", string origin = "", WebSocketVersion version = WebSocketVersion.None, EndPoint httpConnectProxy = null, SslProtocols sslProtocols = SslProtocols.None, int receiveBufferSize = 0, Action<SecurityOption> securityConfig = null)
+        public WebSocketClient(string uri, Action<WebSocketClientOption> config=null, Action<SecurityOption> securityConfig=null)
         {
-            _internalWebSocket = new WebSocket(uri, subProtocol, cookies, customHeaderItems, userAgent, origin, version, httpConnectProxy, sslProtocols, receiveBufferSize);
-            securityConfig?.Invoke(_internalWebSocket.Security);
+            Options = new WebSocketClientOption();
+            config?.Invoke(Options);
+            _internalWebSocket = new WebSocket(uri,
+                Options.SubProtocol,
+                Options.Cookies,
+                Options.CustomHeaderItems,
+                Options.UserAgent,
+                Options.Origin,
+                Options.Version,
+                Options.HttpConnectProxy,
+                Options.SslProtocols,
+                Options.ReceiveBufferSize);
+            Security = _internalWebSocket.Security;
+            securityConfig?.Invoke(Security);
         }
 
         public Task ConnectAsync(CancellationToken cts = default(CancellationToken))
@@ -57,7 +68,7 @@ namespace AsyncWebSocketClient
                     }
                 }, cts);
 
-                await Task.WhenAny(connectTask, Task.Delay(DisconnectionTimeout, cts)).ConfigureAwait(false);
+                await Task.WhenAny(connectTask, Task.Delay(Options.ConnectTimeout, cts)).ConfigureAwait(false);
 
                 if (!connectTask.IsCompleted)
                 {
@@ -78,6 +89,11 @@ namespace AsyncWebSocketClient
         {
             var task = Task.Run(async () =>
             {
+                if (_internalWebSocket.State != WebSocketState.Open)
+                {
+                    throw new WebSocketClientException("The socket isn't open.");
+                }
+
                 _internalWebSocket.Close();
 
                 var closeTask = Task.Run(async () =>
@@ -90,7 +106,7 @@ namespace AsyncWebSocketClient
                     }
                 }, cts);
 
-                await Task.WhenAny(closeTask, Task.Delay(ConnectionTimeout, cts)).ConfigureAwait(false);
+                await Task.WhenAny(closeTask, Task.Delay(Options.DisconnectTimeout, cts)).ConfigureAwait(false);
 
                 if (!closeTask.IsCompleted)
                 {
@@ -125,6 +141,21 @@ namespace AsyncWebSocketClient
 
             return task;
         }
+    }
+
+    public class WebSocketClientOption
+    {
+        public string SubProtocol { get; set; } = "";
+        public List<KeyValuePair<string, string>> Cookies { get; set; } = null;
+        public List<KeyValuePair<string, string>> CustomHeaderItems { get; set; } = null;
+        public string UserAgent { get; set; } = "";
+        public string Origin { get; set; } = "";
+        public WebSocketVersion Version { get; set; } = WebSocketVersion.None;
+        public EndPoint HttpConnectProxy { get; set; } = null;
+        public SslProtocols SslProtocols { get; set; } = SslProtocols.None;
+        public int ReceiveBufferSize { get; set; } = 0;
+        public TimeSpan ConnectTimeout { get; set; }
+        public TimeSpan DisconnectTimeout { get; set; }
     }
 
     public class WebSocketClientException : Exception
