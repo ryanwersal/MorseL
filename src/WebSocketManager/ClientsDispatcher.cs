@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Text;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Logging;
 using WebSocketManager.Common;
 using WebSocketManager.Sockets;
 
@@ -31,25 +32,41 @@ namespace WebSocketManager
 
     public class ClientsDispatcher
     {
+        private readonly ILogger _logger;
         private WebSocketConnectionManager Manager { get; }
 
-        public ClientsDispatcher(WebSocketConnectionManager manager)
+        public ClientsDispatcher(WebSocketConnectionManager manager, ILogger<ClientsDispatcher> logger)
         {
             Manager = manager;
+            _logger = logger;
 
             All = new ClientInvoker(
                 async (methodName, args) =>
                 {
                     foreach (var connection in Manager.GetAll())
                     {
-                        await connection.Socket.InvokeClientMethodAsync(methodName, args).ConfigureAwait(false);
+                        try
+                        {
+                            await connection.Socket.InvokeClientMethodAsync(methodName, args).ConfigureAwait(false);
+                        }
+                        catch (Exception e)
+                        {
+                            _logger.LogError(e.Message);
+                        }
                     }
                 },
                 async msg =>
                 {
                     foreach (var connection in Manager.GetAll())
                     {
-                        await connection.Socket.SendMessageAsync(msg).ConfigureAwait(false);
+                        try
+                        {
+                            await connection.Socket.SendMessageAsync(msg).ConfigureAwait(false);
+                        }
+                        catch (Exception e)
+                        {
+                            _logger.LogError(e.Message);
+                        }
                     }
                 });
         }
@@ -58,9 +75,7 @@ namespace WebSocketManager
 
         public IClientInvoker Group(string groupId)
         {
-            return new ClientInvoker(
-                (methodName, args) => Task.CompletedTask,
-                msg => Task.CompletedTask);
+            return new ClientInvoker((methodName, args) => Task.CompletedTask, msg => Task.CompletedTask);
         }
 
         public IClientInvoker Client(string connectionId)

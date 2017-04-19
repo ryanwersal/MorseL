@@ -6,17 +6,20 @@ using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using WebSocketManager.Sockets.Internal;
 
 namespace WebSocketManager.Sockets
 {
     public class WebSocketManagerMiddleware
     {
+        private readonly ILogger _logger;
         private readonly RequestDelegate _next;
         private Type HandlerType { get; }
 
-        public WebSocketManagerMiddleware(RequestDelegate next, Type handlerType)
+        public WebSocketManagerMiddleware(ILogger<WebSocketManagerMiddleware> logger, RequestDelegate next, Type handlerType)
         {
+            _logger = logger;
             _next = next;
             HandlerType = handlerType;
         }
@@ -33,37 +36,39 @@ namespace WebSocketManager.Sockets
 
             var socket = await context.WebSockets.AcceptWebSocketAsync().ConfigureAwait(false);
 
-            await handler.OnConnected(socket, context).ConfigureAwait(false);
-
             try
             {
-                // Jump onto the thread pool thread so blocking user code doesn't block the setup of the
-                // connection and transport
-                await AwaitableThreadPool.Yield();
+                // TODO : Consider/Decide on pulling web socket manager outside of handler
+                await handler.OnConnected(socket, context).ConfigureAwait(false);
 
                 await Receive(socket, async (result, serializedInvocationDescriptor) =>
                 {
                     if (result.MessageType == WebSocketMessageType.Text)
                     {
-                        await handler.ReceiveAsync(socket, result, serializedInvocationDescriptor).ConfigureAwait(false);
+                        await handler.ReceiveAsync(socket, result, serializedInvocationDescriptor)
+                            .ConfigureAwait(false);
                     }
                     else if (result.MessageType == WebSocketMessageType.Close)
                     {
                         await handler.OnDisconnected(socket, null);
                     }
-                });
-            }
-            catch (WebSocketException)
-            {
-                throw;
+                }).ConfigureAwait(false);
             }
             catch (Exception exception)
             {
-                await handler.OnDisconnected(socket, exception);
+                _logger.LogError(exception.Message);
+                try
+                {
+                    await handler.OnDisconnected(socket, exception);
+                }
+                catch (WebSocketException webSocketException)
+                {
+                    _logger.LogError(webSocketException.Message);
+                }
             }
 
             //TODO - investigate the Kestrel exception thrown when this is the last middleware
-            //await _next.Invoke(context);
+            await _next.Invoke(context);
         }
 
         private async Task Receive(WebSocket socket, Action<WebSocketReceiveResult, string> handleMessage)

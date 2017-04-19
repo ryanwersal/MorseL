@@ -17,7 +17,8 @@ namespace WebSocketManager
 {
     public class HubWebSocketHandler<THub> : HubWebSocketHandler<THub, IClientInvoker> where THub : Hub<IClientInvoker>
     {
-        public HubWebSocketHandler(WebSocketConnectionManager webSocketConnectionManager, ILogger<HubWebSocketHandler<THub, IClientInvoker>> logger, IServiceScopeFactory serviceScopeFactory) : base(webSocketConnectionManager, logger, serviceScopeFactory)
+        public HubWebSocketHandler(IServiceProvider services, ILoggerFactory loggerFactory, IServiceScopeFactory serviceScopeFactory)
+            : base(services, loggerFactory)
         {
         }
     }
@@ -26,17 +27,16 @@ namespace WebSocketManager
     {
         private readonly Dictionary<string, HubMethodDescriptor> _methods = new Dictionary<string, HubMethodDescriptor>(StringComparer.OrdinalIgnoreCase);
 
+        private readonly IServiceProvider _services;
         private readonly IServiceScopeFactory _serviceScopeFactory;
         private readonly ILogger<HubWebSocketHandler<THub, TClient>> _logger;
         private readonly IAuthorizeData[] _authorizeData;
 
-        public HubWebSocketHandler(
-            WebSocketConnectionManager webSocketConnectionManager,
-            ILogger<HubWebSocketHandler<THub, TClient>> logger,
-            IServiceScopeFactory serviceScopeFactory) : base(webSocketConnectionManager)
+        public HubWebSocketHandler(IServiceProvider services, ILoggerFactory loggerFactory) : base(services, loggerFactory)
         {
-            _logger = logger;
-            _serviceScopeFactory = serviceScopeFactory;
+            _services = services;
+            _logger = loggerFactory.CreateLogger<HubWebSocketHandler<THub, TClient>>();
+            _serviceScopeFactory = services.GetRequiredService<IServiceScopeFactory>();
 
             _authorizeData = typeof(THub).GetTypeInfo().GetCustomAttributes().OfType<IAuthorizeData>().ToArray();
             DiscoverHubMethods();
@@ -96,7 +96,7 @@ namespace WebSocketManager
 
         private void InitializeHub(THub hub, Connection connection)
         {
-            hub.Clients = new ClientsDispatcher(WebSocketConnectionManager);
+            hub.Clients = ActivatorUtilities.CreateInstance<ClientsDispatcher>(_services);
             hub.Context = new HubCallerContext(connection);
             hub.Groups = new GroupsManager();
         }

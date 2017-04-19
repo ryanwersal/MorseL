@@ -2,18 +2,20 @@
 using System.Net.WebSockets;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Http;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using WebSocketManager.Common;
-using WebSocketManager.Sockets;
 
-namespace WebSocketManager
+namespace WebSocketManager.Sockets
 {
     public abstract class WebSocketHandler
     {
-        protected WebSocketConnectionManager WebSocketConnectionManager { get; set; }
-
-        protected WebSocketHandler(WebSocketConnectionManager webSocketConnectionManager)
+        private readonly ILogger _logger;
+        protected WebSocketConnectionManager WebSocketConnectionManager { get; }
+        protected WebSocketHandler(IServiceProvider services, ILoggerFactory loggerFactory)
         {
-            WebSocketConnectionManager = webSocketConnectionManager;
+            WebSocketConnectionManager = services.GetRequiredService<WebSocketConnectionManager>();
+            _logger = loggerFactory.CreateLogger<WebSocketHandler>();
         }
 
         public async Task OnConnected(WebSocket socket, HttpContext context)
@@ -21,20 +23,44 @@ namespace WebSocketManager
             var connection = WebSocketConnectionManager.AddSocket(socket);
             connection.User = context.User;
 
-            await connection.Socket.SendMessageAsync(new Message()
-            {
-                MessageType = MessageType.ConnectionEvent,
-                Data = connection.Id
-            }).ConfigureAwait(false);
+            _logger.LogInformation($"Connection established for ID {connection.Id}");
 
-            await OnConnectedAsync(connection);
+            try
+            {
+                await connection.Socket.SendMessageAsync(new Message()
+                {
+                    MessageType = MessageType.ConnectionEvent,
+                    Data = connection.Id
+                }).ConfigureAwait(false);
+
+                await OnConnectedAsync(connection);
+            }
+            catch (Exception e)
+            {
+                _logger.LogError(e.Message);
+                await WebSocketConnectionManager.RemoveConnection(connection.Id);
+                throw;
+            }
         }
 
         public async Task OnDisconnected(WebSocket socket, Exception exception)
         {
             var connection = WebSocketConnectionManager.GetConnection(socket);
 
-            await WebSocketConnectionManager.RemoveConnection(connection.Id).ConfigureAwait(false);
+            try
+            {
+                await WebSocketConnectionManager.RemoveConnection(connection.Id).ConfigureAwait(false);
+            }
+            catch (Exception removeException)
+            {
+                // Likely the same reason why we disconnected
+                if (!removeException.Equals(exception))
+                {
+                    _logger.LogError(removeException.Message);
+                }
+            }
+
+            _logger.LogInformation($"Connection closed for ID {connection.Id}");
 
             await OnDisconnectedAsync(connection, exception);
         }
