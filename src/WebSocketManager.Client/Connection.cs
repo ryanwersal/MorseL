@@ -33,10 +33,12 @@ namespace WebSocketManager.Client
         public event Action Connected;
         public event Action<Exception> Closed;
 
-        public Connection(string uri, string name = null, Action<SecurityOption> securityConfig = null)
+        public Connection(string uri, string name = null, Action<WebSocketClientOption> config = null, Action<SecurityOption> securityConfig = null)
         {
             Name = name;
-            _clientWebSocket = new WebSocketClient(uri, securityConfig: securityConfig);
+            _clientWebSocket = new WebSocketClient(uri, config, securityConfig);
+            _clientWebSocket.Connected += () => Connected?.Invoke();
+            _clientWebSocket.Closed += () => Closed?.Invoke(null);
         }
 
         public Task StartAsync()
@@ -44,8 +46,6 @@ namespace WebSocketManager.Client
             Task.Run(async () =>
             {
                 await _clientWebSocket.ConnectAsync().ConfigureAwait(false);
-
-                Connected?.Invoke();
 
                 _receiveLoopTask = Receive(message =>
                 {
@@ -159,14 +159,12 @@ namespace WebSocketManager.Client
         public async Task DisposeAsync()
         {
             if (_clientWebSocket.State != WebSocketState.Open) return;
-            await _clientWebSocket.DisconnectAsync(CancellationToken.None).ConfigureAwait(false);
+            await _clientWebSocket.CloseAsync(CancellationToken.None).ConfigureAwait(false);
 
             if (_receiveLoopTask != null)
             {
                 await _receiveLoopTask;
             }
-
-            Closed?.Invoke(null);
         }
 
         private async Task Receive(Action<Message> handleMessage)
@@ -188,7 +186,7 @@ namespace WebSocketManager.Client
 
                     case WebSocketMessageType.Close:
                         await _clientWebSocket
-                            .DisconnectAsync(CancellationToken.None)
+                            .CloseAsync(CancellationToken.None)
                             .ConfigureAwait(false);
                         break;
                     default:

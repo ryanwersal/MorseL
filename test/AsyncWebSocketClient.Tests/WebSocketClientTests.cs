@@ -13,48 +13,51 @@ namespace AsyncWebSocketClient.Tests
     public class WebSocketClientTests
     {
         // TODO : The internal web socket also times out - but with a generic SocketException...
-        [Theory(DisplayName = nameof(ConnectTimesOutAfterXSecondsAndThrowsException))]
-        [InlineData(1)]
-        [InlineData(2)]
-        public void ConnectTimesOutAfterXSecondsAndThrowsException(int timeoutInSeconds)
+        [Fact(DisplayName = nameof(ConnectTimesOutAfterXSecondsAndThrowsException))]
+        public async void ConnectTimesOutAfterXSecondsAndThrowsException()
         {
             using (var tcpListener = new SimpleTcpListener(new IPEndPoint(IPAddress.Any, 5000)))
             {
                 tcpListener.Start();
 
-                var client = new WebSocketClient("ws://localhost:5000",
-                    option => option.ConnectTimeout = TimeSpan.FromSeconds(timeoutInSeconds));
+                var client = new WebSocketClient("ws://localhost:5000");
 
-                var time = DateTime.Now;
-
-                var task = client.ConnectAsync();
-                Task.WaitAny(task);
-
-                // Tolerance: 10%
-                Assert.InRange(DateTime.Now - time, TimeSpan.Zero, TimeSpan.FromSeconds(timeoutInSeconds + .1 * timeoutInSeconds));
-                Assert.True(task.IsCompleted);
-                Assert.True(task.IsFaulted);
-                Assert.Equal(task?.Exception?.InnerException?.Message, "The operation has timed out.");
+                try
+                {
+                    await client.ConnectAsync();
+                }
+                catch (Exception e)
+                {
+                    Assert.True(e.Message.StartsWith("No connection could be made because"));
+                }
             }
         }
 
-        [Theory(DisplayName = nameof(DisconnectTimesOutAfterXSeconds), Skip = "TODO")]
-        [InlineData(1)]
-        [InlineData(2)]
-        public void DisconnectTimesOutAfterXSeconds(int timeoutInSeconds)
-        {
-            // TODO
-        }
-
         [Fact(DisplayName = nameof(DisconnectingUnopenClientThrowsException))]
-        public void DisconnectingUnopenClientThrowsException()
+        public async void DisconnectingUnopenClientThrowsException()
         {
             var client = new WebSocketClient("ws://localhost:5000");
-            var task = client.DisconnectAsync();
-            Task.WaitAny(task);
-            Assert.True(task.IsCompleted);
-            Assert.True(task.IsFaulted);
-            Assert.Equal(task?.Exception?.InnerException?.Message, "The socket isn't open.");
+            try
+            {
+                await client.CloseAsync();
+            }
+            catch (Exception e)
+            {
+                Assert.Equal(e.Message, "The socket isn't open.");
+            }
+        }
+
+        [Fact(DisplayName = nameof(ConnectCalledOnConnectComplete))]
+        public async void ConnectCalledOnConnectComplete()
+        {
+            using (new SimpleWebSocketServer(IPAddress.Any, 5000).Start())
+            {
+                bool connectedCalled = false;
+                var client = new WebSocketClient("ws://localhost:5000");
+                client.Connected += () => connectedCalled = true;
+                await client.ConnectAsync();
+                Assert.True(connectedCalled);
+            }
         }
     }
 }
