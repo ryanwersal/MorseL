@@ -11,4 +11,9 @@
     <ProjectReference Include="..\..\src\WebSocketManager\WebSocketManager.csproj" />
   </ItemGroup>
 
+    <None Update="client.pfx">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
+
 </Project>

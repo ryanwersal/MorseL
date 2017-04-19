@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Diagnostics;
+using System.Security.Cryptography.X509Certificates;
 using System.Threading.Tasks;
 using WebSocketManager.Client;
 
@@ -9,7 +10,7 @@ public class Program
 
     public static void Main(string[] args)
     {
-        var connectionTask = StartConnectionAsync();
+        StartConnectionAsync().Wait();
 
         _connection.On("receiveMessage", new [] { typeof(string), typeof(string) }, (arguments) =>
         {
@@ -37,8 +38,13 @@ public class Program
 
     public static async Task StartConnectionAsync()
     {
-        _connection = new Connection();
-        await _connection.StartAsync("wss://localhost:5001/chat");
+        _connection = new Connection("wss://localhost:5001/chat", securityConfig: option =>
+        {
+            option.Certificates.Add(new X509Certificate2("client.pfx"));
+            option.AllowUnstrustedCertificate = true;
+            option.AllowNameMismatchCertificate = true;
+        });
+        await _connection.StartAsync();
     }
 
     public static async Task StopConnectionAsync()
