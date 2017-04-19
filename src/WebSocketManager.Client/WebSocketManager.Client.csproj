@@ -11,10 +11,6 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="System.Net.WebSockets.Client" Version="4.3.0" />
-  </ItemGroup>
-
-  <ItemGroup>
     <ProjectReference Include="..\AsyncWebSocketClient\AsyncWebSocketClient.csproj" />
     <ProjectReference Include="..\WebSocketManager.Common\WebSocketManager.Common.csproj" />
   </ItemGroup>

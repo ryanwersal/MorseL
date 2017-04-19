@@ -15,6 +15,12 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "AsyncWebSocketClient", "src
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "WebSocketManager.Sockets", "src\WebSocketManager.Sockets\WebSocketManager.Sockets.csproj", "{65049EF5-58F0-44E7-956B-8DB80C7EF5CA}"
 EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "src", "src", "{74ABC03E-B81C-4976-8165-FB5BE5288203}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "tests", "tests", "{8924980E-64FB-44C0-B837-99BBFD8240CB}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "AsyncWebSocketClient.Tests", "test\AsyncWebSocketClient.Tests\AsyncWebSocketClient.Tests.csproj", "{77BB6602-F243-4B97-9E64-B6076E5D92F5}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
