@@ -4,9 +4,15 @@ param(
 
 if ($clean) {
     dotnet clean .\WebSocketManager.sln
+    Get-ChildItem ./ -include obj -recurse | foreach ($_) {Remove-Item -Recurse -Force $_.fullname}
+    Get-ChildItem ./ -include bin -recurse | foreach ($_) {Remove-Item -Recurse -Force $_.fullname}
 }
 
-dotnet build .\WebSocketManager.sln
+Get-ChildItem "." -Recurse -Filter "*.csproj" | 
+Foreach-Object {
+    dotnet restore $_.FullName
+    dotnet build $_.FullName
+}
 
 Get-ChildItem "." -Recurse -Filter "*Tests.csproj" | 
 Foreach-Object {
