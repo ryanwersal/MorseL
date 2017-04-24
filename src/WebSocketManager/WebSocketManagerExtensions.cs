@@ -2,14 +2,16 @@
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.DependencyInjection;
+using WebSocketManager.Scaleout;
 using WebSocketManager.Sockets;
 
 namespace WebSocketManager
 {
     public static class WebSocketManagerExtensions
     {
-        public static IServiceCollection AddWebSocketManager(this IServiceCollection services)
+        public static IServiceCollection AddWebSocketManager(this IServiceCollection services, IScaleoutBackPlane scaleoutBackPlane = null)
         {
+            services.AddSingleton(scaleoutBackPlane ?? new ScaleoutBackPlane());
             services.AddSingleton<WebSocketConnectionManager>();
             services.AddSingleton(typeof(HubWebSocketHandler<>), typeof(HubWebSocketHandler<>));
             services.AddScoped(typeof(IHubActivator<,>), typeof(DefaultHubActivator<,>));

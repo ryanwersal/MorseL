@@ -1,5 +1,5 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
-  <Import Project="../../version.props"/>
+  <Import Project="../../version.props" />
 
   <PropertyGroup>
     <TargetFramework>netstandard1.6</TargetFramework>
@@ -15,6 +15,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\WebSocketManager.Common\WebSocketManager.Common.csproj" />
+    <ProjectReference Include="..\WebSocketManager.Scaleout\WebSocketManager.Scaleout.csproj" />
     <ProjectReference Include="..\WebSocketManager.Sockets\WebSocketManager.Sockets.csproj" />
   </ItemGroup>
 

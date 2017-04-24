@@ -3,7 +3,6 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
 using System.Security.Claims;
-using System.Text;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.Extensions.DependencyInjection;
@@ -11,6 +10,7 @@ using Microsoft.Extensions.Logging;
 using WebSocketManager.Common;
 using WebSocketManager.Common.Serialization;
 using WebSocketManager.Internal;
+using WebSocketManager.Scaleout;
 using WebSocketManager.Sockets;
 
 namespace WebSocketManager
@@ -31,12 +31,14 @@ namespace WebSocketManager
         private readonly IServiceScopeFactory _serviceScopeFactory;
         private readonly ILogger<HubWebSocketHandler<THub, TClient>> _logger;
         private readonly IAuthorizeData[] _authorizeData;
+        private readonly IScaleoutBackPlane _scaleoutBackPlane;
 
         public HubWebSocketHandler(IServiceProvider services, ILoggerFactory loggerFactory) : base(services, loggerFactory)
         {
             _services = services;
             _logger = loggerFactory.CreateLogger<HubWebSocketHandler<THub, TClient>>();
             _serviceScopeFactory = services.GetRequiredService<IServiceScopeFactory>();
+            _scaleoutBackPlane = services.GetService<IScaleoutBackPlane>();
 
             _authorizeData = typeof(THub).GetTypeInfo().GetCustomAttributes().OfType<IAuthorizeData>().ToArray();
             DiscoverHubMethods();
@@ -60,6 +62,8 @@ namespace WebSocketManager
                         hubActivator.Release(hub);
                     }
                 }
+
+                await _scaleoutBackPlane.Register(connection);
             }
             catch (Exception ex)
             {
@@ -86,6 +90,8 @@ namespace WebSocketManager
                         hubActivator.Release(hub);
                     }
                 }
+
+                await _scaleoutBackPlane.UnRegister(connection);
             }
             catch (Exception ex)
             {
@@ -168,11 +174,13 @@ namespace WebSocketManager
 
             var result = await Invoke(descriptor, connection, invocationDescriptor);
 
-            await connection.Socket.SendMessageAsync(new Message
+            var message = new Message
             {
                 MessageType = MessageType.InvocationResult,
                 Data = Json.SerializeObject(result)
-            });
+            };
+
+            await connection.Socket.SendMessageAsync(message);
         }
 
         private async Task<InvocationResultDescriptor> Invoke(HubMethodDescriptor descriptor, Connection connection, InvocationDescriptor invocationDescriptor)
