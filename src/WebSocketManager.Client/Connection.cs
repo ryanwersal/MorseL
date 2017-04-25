@@ -1,10 +1,13 @@
 ﻿using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using AsyncWebSocketClient;
+using Microsoft.Extensions.Logging;
+using Nito.AsyncEx.Synchronous;
 using SuperSocket.ClientEngine;
 using WebSocketManager.Common;
 using WebSocketManager.Common.Serialization;
@@ -20,6 +23,7 @@ namespace WebSocketManager.Client
 
         private WebSocketClient _clientWebSocket { get; }
         private string Name { get; }
+        private ILogger _logger;
 
         private int _nextId = 0;
 
@@ -33,9 +37,10 @@ namespace WebSocketManager.Client
         public event Action Connected;
         public event Action<Exception> Closed;
 
-        public Connection(string uri, string name = null, Action<WebSocketClientOption> config = null, Action<SecurityOption> securityConfig = null)
+        public Connection(string uri, string name = null, Action<WebSocketClientOption> config = null, Action<SecurityOption> securityConfig = null, ILogger logger = null)
         {
             Name = name;
+            _logger = logger;
             _clientWebSocket = new WebSocketClient(uri, config, securityConfig);
             _clientWebSocket.Connected += () => Connected?.Invoke();
             _clientWebSocket.Closed += () => Closed?.Invoke(null);
@@ -57,6 +62,11 @@ namespace WebSocketManager.Client
 
                         case MessageType.ClientMethodInvocation:
                             var invocationDescriptor = Json.DeserializeInvocationDescriptor(message.Data, _handlers);
+                            if (invocationDescriptor == null)
+                            {
+                                _logger.LogDebug("Invocation request for unknown hub method");
+                                return;
+                            }
                             InvokeOn(invocationDescriptor);
                             break;
 
@@ -67,6 +77,7 @@ namespace WebSocketManager.Client
                             break;
                     }
                 });
+                _receiveLoopTask.ContinueWith(task => task.WaitAndUnwrapException());
 
             }).ContinueWith(task =>
             {

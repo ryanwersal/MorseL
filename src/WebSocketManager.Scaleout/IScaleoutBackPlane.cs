@@ -1,7 +1,6 @@
 ﻿
 using System;
 using System.Threading.Tasks;
-using WebSocketManager.Common;
 using WebSocketManager.Sockets;
 
 namespace WebSocketManager.Scaleout

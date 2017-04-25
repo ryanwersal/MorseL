@@ -31,6 +31,11 @@ namespace WebSocketManager.Common.Serialization
                 MethodName = json.Value<string>("MethodName")
             };
 
+            if (!handlers.ContainsKey(invocationDescriptor.MethodName))
+            {
+                return null;
+            }
+
             var argTypes = handlers[invocationDescriptor.MethodName].ParameterTypes;
             invocationDescriptor.Arguments = new object[argTypes.Length];
 

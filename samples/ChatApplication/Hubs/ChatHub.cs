@@ -23,8 +23,9 @@ namespace ChatApplication.Hubs
             await Clients.All.InvokeAsync("receiveMessage", socketId, message);
         }
 
-        public string Ping()
+        public async Task<string> Ping()
         {
+            await Clients.Client(Context.ConnectionId).InvokeAsync("adfasdf");
             return "Pong";
         }
 

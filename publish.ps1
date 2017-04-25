@@ -9,6 +9,7 @@ $projects = @(
     "WebSocketManager.Common",
     "WebSocketManager.Client",
     "WebSocketManager.Sockets",
+    "WebSocketManager.Scaleout",
     "AsyncWebSocketClient"
 )
 

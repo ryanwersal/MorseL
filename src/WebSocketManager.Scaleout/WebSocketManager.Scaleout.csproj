@@ -12,4 +12,9 @@
     <DebugSymbols>True</DebugSymbols>
   </PropertyGroup>
 
+  <ItemGroup>
+    <ProjectReference Include="..\WebSocketManager.Common\WebSocketManager.Common.csproj" />
+    <ProjectReference Include="..\WebSocketManager.Sockets\WebSocketManager.Sockets.csproj" />
+  </ItemGroup>
+
 </Project>

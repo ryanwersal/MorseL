@@ -68,7 +68,7 @@ namespace WebSocketManager.Sockets
             }
 
             //TODO - investigate the Kestrel exception thrown when this is the last middleware
-            await _next.Invoke(context);
+            //await _next.Invoke(context);
         }
 
         private async Task Receive(WebSocket socket, Action<WebSocketReceiveResult, string> handleMessage)
