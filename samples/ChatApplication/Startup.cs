@@ -3,7 +3,7 @@ using ChatApplication.Hubs;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
-using WebSocketManager;
+using MorseL;
 
 namespace ChatApplication
 {
@@ -16,14 +16,14 @@ namespace ChatApplication
                 .AddDebug();
 
             app.UseWebSockets();
-            app.MapWebSocketManagerHub<ChatHub>("/chat");
+            app.MapMorseLHub<ChatHub>("/chat");
 
             app.UseStaticFiles();
         }
 
         public void ConfigureServices(IServiceCollection services)
         {
-            services.AddWebSocketManager();
+            services.AddMorseL();
         }
     }
 }

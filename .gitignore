@@ -253,7 +253,7 @@ paket-files/
 
 .vscode/
 
-src/WebSocketManager.Client.TS/app/build/
+src/MorseL.Client.TS/app/build/
 
 *.map
 *.min.js

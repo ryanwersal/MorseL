@@ -1,7 +1,7 @@
 ﻿using System.Threading.Tasks;
-using WebSocketManager;
-using WebSocketManager.Common;
-using WebSocketManager.Sockets;
+using MorseL;
+using MorseL.Common;
+using MorseL.Sockets;
 
 namespace ChatApplication.Hubs
 {

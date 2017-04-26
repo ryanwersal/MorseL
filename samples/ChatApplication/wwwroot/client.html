@@ -14,11 +14,11 @@
     <ul id="messages"></ul>
 
 
-    <script data-main="scripts/main" src="WebSocketManager.js"></script>
+    <script data-main="scripts/main" src="MorseL.js"></script>
 
     <script language="javascript" type="text/javascript">
 
-            var connection = new WebSocketManager.Connection((location.protocol == "http" ? "ws" : "wss") + "://localhost:" + location.port + "/chat");
+            var connection = new MorseL.Connection((location.protocol == "http" ? "ws" : "wss") + "://localhost:" + location.port + "/chat");
             connection.enableLogging = true;
 
             connection.connectionMethods.onConnected = () => {

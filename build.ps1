@@ -3,7 +3,7 @@ param(
 )
 
 if ($clean) {
-    dotnet clean .\WebSocketManager.sln
+    dotnet clean .\MorseL.sln
     Get-ChildItem ./ -include obj -recurse | foreach ($_) {Remove-Item -Recurse -Force $_.fullname}
     Get-ChildItem ./ -include bin -recurse | foreach ($_) {Remove-Item -Recurse -Force $_.fullname}
 }

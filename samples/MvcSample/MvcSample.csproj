@@ -5,8 +5,8 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <Content Include="wwwroot\WebSocketManager.js" />
-    <Content Include="wwwroot\WebSocketManager.js.map" />
+    <Content Include="wwwroot\MorseL.js" />
+    <Content Include="wwwroot\MorseL.js.map" />
   </ItemGroup>
 
   <ItemGroup>
@@ -16,8 +16,8 @@
     <PackageReference Include="Microsoft.AspNetCore.StaticFiles" Version="1.1.0" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\..\src\WebSocketManager.Common\WebSocketManager.Common.csproj" />
-    <ProjectReference Include="..\..\src\WebSocketManager\WebSocketManager.csproj" />
+    <ProjectReference Include="..\..\src\MorseL.Common\MorseL.Common.csproj" />
+    <ProjectReference Include="..\..\src\MorseL\MorseL.csproj" />
   </ItemGroup>
 
 </Project>

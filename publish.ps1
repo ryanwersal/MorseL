@@ -5,12 +5,12 @@ param(
 )
 
 $projects = @(
-    "WebSocketManager",
-    "WebSocketManager.Common",
-    "WebSocketManager.Client",
-    "WebSocketManager.Sockets",
-    "WebSocketManager.Scaleout",
-    "AsyncWebSocketClient"
+    "MorseL",
+    "MorseL.Common",`
+    "MorseL.Client",
+    "MorseL.Sockets",
+    "MorseL.Scaleout",
+    "MorseL.Client.WebSockets"
 )
 
 $packArguments = New-Object System.Collections.ArrayList

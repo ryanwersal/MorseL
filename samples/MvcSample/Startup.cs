@@ -2,7 +2,7 @@
 using Microsoft.AspNetCore.Builder;
 using Microsoft.Extensions.DependencyInjection;
 using MvcSample.Hubs;
-using WebSocketManager;
+using MorseL;
 
 namespace MvcSample
 {
@@ -21,13 +21,13 @@ namespace MvcSample
                 );
             });
 
-            app.MapWebSocketManagerHub<NotificationsMessageHub>("/notifications");
+            app.MapMorseLHub<NotificationsMessageHub>("/notifications");
         }
 
         public void ConfigureServices(IServiceCollection services)
         {
             services.AddMvc();
-            services.AddWebSocketManager();
+            services.AddMorseL();
         }
     }
 }

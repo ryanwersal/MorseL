@@ -1,4 +1,4 @@
-﻿using WebSocketManager;
+﻿using MorseL;
 
 namespace MvcSample.Hubs
 {

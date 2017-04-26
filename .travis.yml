@@ -15,9 +15,9 @@ addons:
 
 before_script:
   - dotnet restore
-  - dotnet restore samples/WebSocketManagerSamples.sln
+  - dotnet restore samples/MorseLSamples.sln
   
 script:
   - dotnet build
-  - dotnet build samples/WebSocketManagerSamples.sln
-  - dotnet test test/WebSocketManager.Tests/WebSocketManager.Tests.csproj
+  - dotnet build samples/MorseLSamples.sln
+  - dotnet test test/MorseL.Tests/MorseL.Tests.csproj
