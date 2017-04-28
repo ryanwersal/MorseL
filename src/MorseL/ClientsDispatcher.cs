@@ -47,7 +47,7 @@ namespace MorseL
                     {
                         try
                         {
-                            await connection.Socket.InvokeClientMethodAsync(methodName, args).ConfigureAwait(false);
+                            await connection.Channel.InvokeClientMethodAsync(methodName, args).ConfigureAwait(false);
                         }
                         catch (Exception e)
                         {
@@ -61,7 +61,7 @@ namespace MorseL
                     {
                         try
                         {
-                            await connection.Socket.SendMessageAsync(msg).ConfigureAwait(false);
+                            await connection.Channel.SendMessageAsync(msg).ConfigureAwait(false);
                         }
                         catch (Exception e)
                         {
@@ -82,8 +82,8 @@ namespace MorseL
         {
             var connection = Manager.GetConnectionById(connectionId);
             return new ClientInvoker(
-                async (methodName, args) => await connection.Socket.InvokeClientMethodAsync(methodName, args).ConfigureAwait(false),
-                async msg => await connection.Socket.SendMessageAsync(msg).ConfigureAwait(false));
+                async (methodName, args) => await connection.Channel.InvokeClientMethodAsync(methodName, args).ConfigureAwait(false),
+                async msg => await connection.Channel.SendMessageAsync(msg).ConfigureAwait(false));
         }
     }
 }

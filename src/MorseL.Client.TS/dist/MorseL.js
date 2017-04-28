@@ -52,29 +52,24 @@ return /******/ (function(modules) { // webpackBootstrap
 /************************************************************************/
 /******/ ([
 /* 0 */
-/*!******************!*\
-  !*** multi main ***!
-  \******************/
 /***/ (function(module, exports, __webpack_require__) {
 
-	module.exports = __webpack_require__(/*! C:\workspace\github\websocket-manager\src\MorseL.Client.TS/src/Connection.ts */1);
+	module.exports = __webpack_require__(1);
 
 
 /***/ }),
 /* 1 */
-/*!***************************!*\
-  !*** ./src/Connection.ts ***!
-  \***************************/
 /***/ (function(module, exports, __webpack_require__) {
 
 	"use strict";
-	var InvocationDescriptor_1 = __webpack_require__(/*! ./InvocationDescriptor */ 2);
-	var Message_1 = __webpack_require__(/*! ./Message */ 3);
+	var InvocationDescriptor_1 = __webpack_require__(2);
+	var Message_1 = __webpack_require__(3);
 	var Connection = (function () {
 	    function Connection(url, enableLogging) {
 	        var _this = this;
 	        if (enableLogging === void 0) { enableLogging = false; }
 	        this.enableLogging = false;
+	        this.middlewares = [];
 	        this.clientMethods = {};
 	        this.connectionMethods = {};
 	        this.url = url;
@@ -95,6 +90,9 @@ return /******/ (function(modules) { // webpackBootstrap
 	            }
 	        };
 	    }
+	    Connection.prototype.addMiddleware = function (middleware) {
+	        this.middlewares.push(middleware);
+	    };
 	    Connection.prototype.start = function () {
 	        var _this = this;
 	        this.socket = new WebSocket(this.url);
@@ -102,20 +100,29 @@ return /******/ (function(modules) { // webpackBootstrap
 	            _this.connectionMethods['onOpen'].apply(_this, event);
 	        };
 	        this.socket.onmessage = function (event) {
-	            _this.message = JSON.parse(event.data);
-	            if (_this.message.MessageType == Message_1.MessageType.Text) {
-	                if (_this.enableLogging) {
-	                    console.log('Text message received. Message: ' + _this.message.Data);
+	            var index = 0;
+	            var delegate = function (transformedData) {
+	                if (index < _this.middlewares.length) {
+	                    _this.middlewares[index++].receive(transformedData, delegate);
 	                }
-	            }
-	            else if (_this.message.MessageType == Message_1.MessageType.MethodInvocation) {
-	                var invocationDescriptor = JSON.parse(_this.message.Data);
-	                _this.clientMethods[invocationDescriptor.MethodName].apply(_this, invocationDescriptor.Arguments);
-	            }
-	            else if (_this.message.MessageType == Message_1.MessageType.ConnectionEvent) {
-	                _this.connectionId = _this.message.Data;
-	                _this.connectionMethods['onConnected'].apply(_this);
-	            }
+	                else {
+	                    _this.message = JSON.parse(transformedData);
+	                    if (_this.message.MessageType == Message_1.MessageType.Text) {
+	                        if (_this.enableLogging) {
+	                            console.log('Text message received. Message: ' + _this.message.Data);
+	                        }
+	                    }
+	                    else if (_this.message.MessageType == Message_1.MessageType.MethodInvocation) {
+	                        var invocationDescriptor = JSON.parse(_this.message.Data);
+	                        _this.clientMethods[invocationDescriptor.MethodName].apply(_this, invocationDescriptor.Arguments);
+	                    }
+	                    else if (_this.message.MessageType == Message_1.MessageType.ConnectionEvent) {
+	                        _this.connectionId = _this.message.Data;
+	                        _this.connectionMethods['onConnected'].apply(_this);
+	                    }
+	                }
+	            };
+	            delegate(event.data);
 	        };
 	        this.socket.onclose = function (event) {
 	            _this.connectionMethods['onDisconnected'].apply(_this);
@@ -127,6 +134,7 @@ return /******/ (function(modules) { // webpackBootstrap
 	        };
 	    };
 	    Connection.prototype.invoke = function (methodName) {
+	        var _this = this;
 	        var args = [];
 	        for (var _i = 1; _i < arguments.length; _i++) {
 	            args[_i - 1] = arguments[_i];
@@ -135,7 +143,16 @@ return /******/ (function(modules) { // webpackBootstrap
 	        if (this.enableLogging) {
 	            console.log(invocationDescriptor);
 	        }
-	        this.socket.send(JSON.stringify(invocationDescriptor));
+	        var index = 0;
+	        var delegate = function (transformedData) {
+	            if (index < _this.middlewares.length) {
+	                _this.middlewares[index++].send(transformedData, delegate);
+	            }
+	            else {
+	                _this.socket.send(transformedData);
+	            }
+	        };
+	        delegate(JSON.stringify(invocationDescriptor));
 	    };
 	    return Connection;
 	}());
@@ -144,12 +161,10 @@ return /******/ (function(modules) { // webpackBootstrap
 
 /***/ }),
 /* 2 */
-/*!*************************************!*\
-  !*** ./src/InvocationDescriptor.js ***!
-  \*************************************/
 /***/ (function(module, exports) {
 
 	"use strict";
+	Object.defineProperty(exports, "__esModule", { value: true });
 	var InvocationDescriptor = (function () {
 	    function InvocationDescriptor(methodName, args) {
 	        this.MethodName = methodName;
@@ -162,18 +177,16 @@ return /******/ (function(modules) { // webpackBootstrap
 
 /***/ }),
 /* 3 */
-/*!************************!*\
-  !*** ./src/Message.js ***!
-  \************************/
 /***/ (function(module, exports) {
 
 	"use strict";
+	Object.defineProperty(exports, "__esModule", { value: true });
+	var MessageType;
 	(function (MessageType) {
 	    MessageType[MessageType["Text"] = 0] = "Text";
 	    MessageType[MessageType["MethodInvocation"] = 1] = "MethodInvocation";
 	    MessageType[MessageType["ConnectionEvent"] = 2] = "ConnectionEvent";
-	})(exports.MessageType || (exports.MessageType = {}));
-	var MessageType = exports.MessageType;
+	})(MessageType = exports.MessageType || (exports.MessageType = {}));
 	var Message = (function () {
 	    function Message() {
 	    }

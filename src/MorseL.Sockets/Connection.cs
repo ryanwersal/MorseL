@@ -1,8 +1,10 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Net.WebSockets;
 using System.Security.Claims;
 using System.Threading;
 using System.Threading.Tasks;
+using MorseL.Sockets.Middleware;
 
 namespace MorseL.Sockets
 {
@@ -12,12 +14,12 @@ namespace MorseL.Sockets
         public ClaimsPrincipal User { get; set; }
 
         // TODO: Remove this and instead make connections transport-agnostic.
-        public IChannel Socket { get; }
+        public IChannel Channel { get; set; }
 
-        public Connection(string id, WebSocket socket)
+        public Connection(string id, IChannel channel)
         {
             Id = id;
-            Socket = new WebSocketChannel(socket);
+            Channel = channel;
             User = new ClaimsPrincipal();
         }
 
@@ -28,7 +30,7 @@ namespace MorseL.Sockets
 
         public async Task DisposeAsync()
         {
-            await ((WebSocketChannel)Socket).Socket.CloseAsync(WebSocketCloseStatus.NormalClosure,
+            await ((WebSocketChannel)Channel).Socket.CloseAsync(WebSocketCloseStatus.NormalClosure,
                     "Closed by manager.",
                     CancellationToken.None)
                 .ConfigureAwait(false);

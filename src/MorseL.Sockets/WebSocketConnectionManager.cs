@@ -4,12 +4,18 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Net.WebSockets;
 using System.Threading.Tasks;
+using Microsoft.Extensions.DependencyInjection;
+using MorseL.Sockets.Middleware;
 
 namespace MorseL.Sockets
 {
+    /// <summary>
+    /// Singleton instance that manages all Connections.
+    /// </summary>
     public class WebSocketConnectionManager
     {
         private readonly ConcurrentDictionary<string, Connection> _connections = new ConcurrentDictionary<string, Connection>();
+
 
         public Connection GetConnectionById(string id)
         {
@@ -18,7 +24,7 @@ namespace MorseL.Sockets
 
         public Connection GetConnection(WebSocket socket)
         {
-            return _connections.FirstOrDefault(p => ((WebSocketChannel)p.Value.Socket).Socket == socket).Value;
+            return _connections.FirstOrDefault(p => ((WebSocketChannel)p.Value.Channel).Socket == socket).Value;
         }
 
         public ICollection<Connection> GetAll()
@@ -31,14 +37,9 @@ namespace MorseL.Sockets
             return _connections.FirstOrDefault(p => p.Value == connection).Key;
         }
 
-        public string GetId(WebSocket socket)
+        public Connection AddConnection(IChannel channel)
         {
-            return _connections.FirstOrDefault(p => ((WebSocketChannel)p.Value.Socket).Socket == socket).Key;
-        }
-
-        public Connection AddSocket(WebSocket socket)
-        {
-            var connection = new Connection(CreateConnectionId(), socket);
+            var connection = new Connection(CreateConnectionId(), channel);
             _connections.TryAdd(connection.Id, connection);
             return connection;
         }

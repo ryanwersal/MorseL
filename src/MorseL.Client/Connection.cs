@@ -1,17 +1,16 @@
 ﻿using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
-using System.Diagnostics;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using MorseL.Client.WebSockets;
 using Microsoft.Extensions.Logging;
+using MorseL.Client.Middleware;
 using Nito.AsyncEx.Synchronous;
 using SuperSocket.ClientEngine;
 using MorseL.Common;
 using MorseL.Common.Serialization;
-using MorseL.Sockets.Internal;
 using WebSocketMessageType = MorseL.Client.WebSockets.WebSocketMessageType;
 using WebSocketState = WebSocket4Net.WebSocketState;
 
@@ -34,6 +33,8 @@ namespace MorseL.Client
         private readonly Dictionary<string, InvocationRequest> _pendingCalls = new Dictionary<string, InvocationRequest>();
         private readonly ConcurrentDictionary<string, InvocationHandler> _handlers = new ConcurrentDictionary<string, InvocationHandler>();
 
+        private readonly List<IMiddleware> _middleware = new List<IMiddleware>();
+
         public event Action Connected;
         public event Action<Exception> Closed;
 
@@ -44,6 +45,11 @@ namespace MorseL.Client
             _clientWebSocket = new WebSocketClient(uri, config, securityConfig);
             _clientWebSocket.Connected += () => Connected?.Invoke();
             _clientWebSocket.Closed += () => Closed?.Invoke(null);
+        }
+
+        public void AddMiddleware(IMiddleware middleware)
+        {
+            _middleware.Add(middleware);
         }
 
         public Task StartAsync()
@@ -126,7 +132,24 @@ namespace MorseL.Client
             try
             {
                 var message = Json.SerializeObject(descriptor);
-                await _clientWebSocket.SendAsync(message, CancellationToken.None).ConfigureAwait(false);
+
+                var transformIterator = _middleware.GetEnumerator();
+                TransmitDelegate transformDelegator = null;
+                transformDelegator = async data =>
+                {
+                    if (transformIterator.MoveNext())
+                    {
+                        await transformIterator.Current.SendAsync(data, transformDelegator).ConfigureAwait(false);
+                    }
+                    else
+                    {
+                        await _clientWebSocket.SendAsync(data, CancellationToken.None).ConfigureAwait(false);
+                    }
+                };
+                await transformDelegator
+                    .Invoke(message)
+                    .ContinueWith(task => transformIterator.Dispose())
+                    .ConfigureAwait(false);
             }
             catch (Exception e)
             {
@@ -183,26 +206,49 @@ namespace MorseL.Client
             while (_clientWebSocket.State == WebSocketState.Open)
             {
                 var receivedMessage = await _clientWebSocket.RecieveAsync(CancellationToken.None).ConfigureAwait(false);
-                switch (receivedMessage.MessageType)
+
+                var receiveIterator = _middleware.GetEnumerator();
+                RecieveDelegate receiveDelegator = null;
+                receiveDelegator = async transformedMessage =>
                 {
-                    case WebSocketMessageType.Binary:
-                        // TODO: Implement.
-                        throw new NotImplementedException("Binary messages not supported.");
+                    if (receiveIterator.MoveNext())
+                    {
+                        await receiveIterator.Current.RecieveAsync(transformedMessage, receiveDelegator).ConfigureAwait(false);
+                    }
+                    else
+                    {
+                        await InternalReceive(transformedMessage, handleMessage).ConfigureAwait(false);
+                    }
+                };
 
-                    case WebSocketMessageType.Text:
-                        var serializedMessage = Encoding.UTF8.GetString(receivedMessage.Data);
-                        var message = Json.Deserialize<Message>(serializedMessage);
-                        handleMessage(message);
-                        break;
+                await receiveDelegator
+                    .Invoke(receivedMessage)
+                    .ContinueWith(task => receiveIterator.Dispose())
+                    .ConfigureAwait(false);
+            }
+        }
 
-                    case WebSocketMessageType.Close:
-                        await _clientWebSocket
-                            .CloseAsync(CancellationToken.None)
-                            .ConfigureAwait(false);
-                        break;
-                    default:
-                        throw new ArgumentOutOfRangeException();
-                }
+        private async Task InternalReceive(WebSocketPacket receivedMessage, Action<Message> handleMessage)
+        {
+            switch (receivedMessage.MessageType)
+            {
+                case WebSocketMessageType.Binary:
+                    // TODO: Implement.
+                    throw new NotImplementedException("Binary messages not supported.");
+
+                case WebSocketMessageType.Text:
+                    var serializedMessage = Encoding.UTF8.GetString(receivedMessage.Data);
+                    var message = Json.Deserialize<Message>(serializedMessage);
+                    handleMessage(message);
+                    break;
+
+                case WebSocketMessageType.Close:
+                    await _clientWebSocket
+                        .CloseAsync(CancellationToken.None)
+                        .ConfigureAwait(false);
+                    break;
+                default:
+                    throw new ArgumentOutOfRangeException();
             }
         }
 
