@@ -1,5 +1,6 @@
 param(
-    [switch]$clean = $false
+    [switch]$clean = $false,
+    [switch]$skipTests = $false
 )
 
 if ($clean) {
@@ -14,8 +15,10 @@ Foreach-Object {
     dotnet build $_.FullName
 }
 
-Get-ChildItem "." -Recurse -Filter "*Tests.csproj" | 
-Foreach-Object {
-    $name = $_.FullName
-    dotnet test $name
+if (-not $skipTests) {
+    Get-ChildItem "." -Recurse -Filter "*Tests.csproj" | 
+    Foreach-Object {
+        $name = $_.FullName
+        dotnet test $name
+    }
 }

@@ -108,7 +108,7 @@ namespace MorseL.Sockets
                     {
                         if (iterator.MoveNext())
                         {
-                            await iterator.Current.ReceiveAsync(context, delegator);
+                            await iterator.Current.ReceiveAsync(context, delegator).ConfigureAwait(false);
                         }
                         else
                         {

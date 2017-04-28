@@ -34,6 +34,7 @@ namespace MorseL.Sockets
                     "Closed by manager.",
                     CancellationToken.None)
                 .ConfigureAwait(false);
+            ((WebSocketChannel) Channel).Socket.Dispose();
         }
     }
 }

@@ -13,6 +13,7 @@ namespace MorseL.Sockets
         internal readonly WebSocket Socket;
         internal Connection Connection;
         internal IEnumerable<IMiddleware> Middleware;
+        private SemaphoreSlim _writeLock = new SemaphoreSlim(1);
 
         public WebSocketChannel(WebSocket socket, IEnumerable<IMiddleware> middleware)
         {
@@ -49,17 +50,26 @@ namespace MorseL.Sockets
         {
             var buffer = new byte[8000];
 
-            int count;
-            do
+            await _writeLock.WaitAsync().ConfigureAwait(false);
+
+            try
             {
-                count = await stream.ReadAsync(buffer, 0, buffer.Length).ConfigureAwait(false);
-                await Socket.SendAsync(
-                        new ArraySegment<byte>(buffer, 0, count),
-                        WebSocketMessageType.Text,
-                        count == 0,
-                        CancellationToken.None)
-                    .ConfigureAwait(false);
-            } while (count > 0);
+                int count;
+                do
+                {
+                    count = await stream.ReadAsync(buffer, 0, buffer.Length).ConfigureAwait(false);
+                    await Socket.SendAsync(
+                            new ArraySegment<byte>(buffer, 0, count),
+                            WebSocketMessageType.Text,
+                            count < buffer.Length,
+                            CancellationToken.None)
+                        .ConfigureAwait(false);
+                } while (count == buffer.Length);
+            }
+            finally
+            {
+                _writeLock.Release();
+            }
         }
     }
 }

@@ -194,6 +194,7 @@ namespace MorseL.Client
         {
             if (_clientWebSocket.State != WebSocketState.Open) return;
             await _clientWebSocket.CloseAsync(CancellationToken.None).ConfigureAwait(false);
+            _clientWebSocket.Dispose();
 
             if (_receiveLoopTask != null)
             {
@@ -203,28 +204,34 @@ namespace MorseL.Client
 
         private async Task Receive(Action<Message> handleMessage)
         {
-            while (_clientWebSocket.State == WebSocketState.Open)
+            try
             {
-                var receivedMessage = await _clientWebSocket.RecieveAsync(CancellationToken.None).ConfigureAwait(false);
-
-                var receiveIterator = _middleware.GetEnumerator();
-                RecieveDelegate receiveDelegator = null;
-                receiveDelegator = async transformedMessage =>
+                while (_clientWebSocket.State == WebSocketState.Open)
                 {
-                    if (receiveIterator.MoveNext())
-                    {
-                        await receiveIterator.Current.RecieveAsync(transformedMessage, receiveDelegator).ConfigureAwait(false);
-                    }
-                    else
-                    {
-                        await InternalReceive(transformedMessage, handleMessage).ConfigureAwait(false);
-                    }
-                };
+                    var receivedMessage = await _clientWebSocket.RecieveAsync(CancellationToken.None).ConfigureAwait(false);
 
-                await receiveDelegator
-                    .Invoke(receivedMessage)
-                    .ContinueWith(task => receiveIterator.Dispose())
-                    .ConfigureAwait(false);
+                    var receiveIterator = _middleware.GetEnumerator();
+                    RecieveDelegate receiveDelegator = null;
+                    receiveDelegator = async transformedMessage =>
+                    {
+                        if (receiveIterator.MoveNext())
+                        {
+                            await receiveIterator.Current.RecieveAsync(transformedMessage, receiveDelegator).ConfigureAwait(false);
+                        }
+                        else
+                        {
+                            await InternalReceive(transformedMessage, handleMessage).ConfigureAwait(false);
+                        }
+                    };
+
+                    await receiveDelegator(receivedMessage)
+                        .ContinueWith(task => receiveIterator.Dispose())
+                        .ConfigureAwait(false);
+                }
+            }
+            catch (WebSocketClosedException)
+            {
+                // Eat the exception because we're closing
             }
         }
 
