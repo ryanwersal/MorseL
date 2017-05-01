@@ -1,8 +1,11 @@
 ﻿using System;
 using System.Diagnostics;
 using System.Security.Cryptography.X509Certificates;
+using System.Text;
 using System.Threading.Tasks;
 using MorseL.Client;
+using MorseL.Client.Middleware;
+using MorseL.Client.WebSockets;
 
 public class Program
 {
@@ -44,6 +47,9 @@ public class Program
             option.AllowUnstrustedCertificate = true;
             option.AllowNameMismatchCertificate = true;
         });
+
+        _connection.AddMiddleware(new Middleware());
+
         await _connection.StartAsync();
     }
 
@@ -61,5 +67,20 @@ public class Program
     {
         var result = await _connection.Invoke<string>("Ping");
         Debug.WriteLine(result);
+    }
+
+    private class Middleware : IMiddleware
+    {
+        public Task SendAsync(string data, TransmitDelegate next)
+        {
+            data = Convert.ToBase64String(Encoding.UTF8.GetBytes(data));
+            return next(data);
+        }
+
+        public Task RecieveAsync(WebSocketPacket packet, RecieveDelegate next)
+        {
+            var data = Convert.FromBase64String(Encoding.UTF8.GetString(packet.Data));
+            return next(new WebSocketPacket(packet.MessageType, data));
+        }
     }
 }

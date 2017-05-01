@@ -1,7 +1,8 @@
 param(
     [Parameter(Mandatory=$true)][string]$repo,
     [switch]$stable = $false,
-    [string]$versionSuffix = $null
+    [string]$versionSuffix = $null,
+    [switch]$symbols = $false
 )
 
 $projects = @(
@@ -31,7 +32,12 @@ foreach ($project in $projects) {
     $_ = $packArguments.RemoveAt($packArguments.Count - 1)
 }
 
-Get-ChildItem "." -Recurse -Filter "*.nupkg" | 
+$filter = "*.nupkg"
+if ($symbols) {
+    $filter = "*symbols.nupkg"
+}
+
+Get-ChildItem "." -Recurse -Filter $filter | 
 Foreach-Object {
     $name = $_.FullName
     nuget add $name -Source $repo -NonInteractive

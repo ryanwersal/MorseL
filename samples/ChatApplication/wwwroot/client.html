@@ -19,6 +19,16 @@
     <script language="javascript" type="text/javascript">
 
             var connection = new MorseL.Connection((location.protocol == "http" ? "ws" : "wss") + "://localhost:" + location.port + "/chat");
+
+            connection.addMiddleware({
+                send: function(message, next) {
+                    next(btoa(message));
+                },
+                receive: function(message, next) {
+                    next(atob(message));
+                }
+            });
+
             connection.enableLogging = true;
 
             connection.connectionMethods.onConnected = () => {

@@ -12,6 +12,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using MorseL;
+using MorseL.Extensions;
 
 namespace MorseL.Client.WebSockets.Tests
 {

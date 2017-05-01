@@ -4,7 +4,7 @@
   "description": "",
   "main": "dist/MorseL.min.js",
   "scripts": {
-    "prepublish": "webpack --debug; webpack -p"
+    "prepublish": "webpack --debug; webpack"
   },
   "author": "Radu Matei <matei.radu94@gmail.com>",
   "license": "MIT",
@@ -13,7 +13,7 @@
     "ts-loader": "^0.8.1",
     "tslint": "^3.5.0",
     "tslint-loader": "^2.1.0",
-    "typescript": "^1.8.2",
+    "typescript": "^1.8.10",
     "webpack": "^1.12.14",
     "yargs": "^4.2.0"
   }

@@ -1,5 +1,6 @@
 import { InvocationDescriptor } from './InvocationDescriptor'
 import { Message, MessageType } from './Message'
+import { Middleware } from './Middleware'
 
 export class Connection {
 
@@ -9,6 +10,8 @@ export class Connection {
 
     protected message: Message;
     protected socket: WebSocket;
+
+    protected middlewares: Middleware[] = [];
 
     public clientMethods: { [s: string]: Function; } = {};
     public connectionMethods: { [s: string]: Function; } = {};
@@ -37,6 +40,10 @@ export class Connection {
         }
     }
 
+    public addMiddleware(middleware: Middleware) {
+        this.middlewares.push(middleware);
+    }
+
     public start() {
         this.socket = new WebSocket(this.url);
 
@@ -45,24 +52,32 @@ export class Connection {
         };
 
         this.socket.onmessage = (event: MessageEvent) => {
-            this.message = JSON.parse(event.data);
+            var index = 0;
+            var delegate = (transformedData: string): void => {
+                if (index < this.middlewares.length) {
+                    this.middlewares[index++].receive(transformedData, delegate);
+                } else {
+                    this.message = JSON.parse(transformedData);
 
-            if (this.message.MessageType == MessageType.Text) {
-                if(this.enableLogging) {
-                    console.log('Text message received. Message: ' + this.message.Data);
+                    if (this.message.MessageType == MessageType.Text) {
+                        if(this.enableLogging) {
+                            console.log('Text message received. Message: ' + this.message.Data);
+                        }
+                    }
+
+                    else if (this.message.MessageType == MessageType.MethodInvocation) {
+                        let invocationDescriptor: InvocationDescriptor = JSON.parse(this.message.Data);
+
+                        this.clientMethods[invocationDescriptor.MethodName].apply(this, invocationDescriptor.Arguments);
+                    }
+
+                    else if (this.message.MessageType == MessageType.ConnectionEvent) {
+                        this.connectionId = this.message.Data;
+                        this.connectionMethods['onConnected'].apply(this);
+                    }
                 }
-            }
-
-            else if (this.message.MessageType == MessageType.MethodInvocation) {
-                let invocationDescriptor: InvocationDescriptor = JSON.parse(this.message.Data);
-
-                this.clientMethods[invocationDescriptor.MethodName].apply(this, invocationDescriptor.Arguments);
-            }
-
-            else if (this.message.MessageType == MessageType.ConnectionEvent) {
-                this.connectionId = this.message.Data;
-                this.connectionMethods['onConnected'].apply(this);
-            }
+            };
+            delegate(event.data);
         }
 
         this.socket.onclose = (event: CloseEvent) => {
@@ -83,6 +98,14 @@ export class Connection {
             console.log(invocationDescriptor);
         }
 
-        this.socket.send(JSON.stringify(invocationDescriptor));
+        var index = 0;
+        var delegate = (transformedData: string): void => {
+            if (index < this.middlewares.length) {
+                this.middlewares[index++].send(transformedData, delegate);
+            } else {
+                this.socket.send(transformedData);
+            }
+        };
+        delegate(JSON.stringify(invocationDescriptor));
     }
 }

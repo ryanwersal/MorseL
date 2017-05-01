@@ -1,10 +1,11 @@
 "use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+var MessageType;
 (function (MessageType) {
     MessageType[MessageType["Text"] = 0] = "Text";
     MessageType[MessageType["MethodInvocation"] = 1] = "MethodInvocation";
     MessageType[MessageType["ConnectionEvent"] = 2] = "ConnectionEvent";
-})(exports.MessageType || (exports.MessageType = {}));
-var MessageType = exports.MessageType;
+})(MessageType = exports.MessageType || (exports.MessageType = {}));
 var Message = (function () {
     function Message() {
     }

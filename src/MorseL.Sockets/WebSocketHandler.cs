@@ -1,33 +1,44 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Net.WebSockets;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using MorseL.Common;
+using MorseL.Sockets.Middleware;
 
 namespace MorseL.Sockets
 {
     public abstract class WebSocketHandler
     {
+        private readonly IServiceProvider _services;
         private readonly ILogger _logger;
         protected WebSocketConnectionManager WebSocketConnectionManager { get; }
+
         protected WebSocketHandler(IServiceProvider services, ILoggerFactory loggerFactory)
         {
+            _services = services;
             WebSocketConnectionManager = services.GetRequiredService<WebSocketConnectionManager>();
             _logger = loggerFactory.CreateLogger<WebSocketHandler>();
         }
 
-        public async Task OnConnected(WebSocket socket, HttpContext context)
+        public async Task<Connection> OnConnected(WebSocket socket, HttpContext context)
         {
-            var connection = WebSocketConnectionManager.AddSocket(socket);
+            // Create the websocket channel / connection
+            var channel = ActivatorUtilities.CreateInstance<WebSocketChannel>(_services, socket);
+            var connection = WebSocketConnectionManager.AddConnection(channel);
+
+            // Set the internal channel's reference to it's containing connection
+            channel.Connection = connection;
+
             connection.User = context.User;
 
             _logger.LogInformation($"Connection established for ID {connection.Id}");
 
             try
             {
-                await connection.Socket.SendMessageAsync(new Message()
+                await connection.Channel.SendMessageAsync(new Message()
                 {
                     MessageType = MessageType.ConnectionEvent,
                     Data = connection.Id
@@ -41,6 +52,8 @@ namespace MorseL.Sockets
                 await WebSocketConnectionManager.RemoveConnection(connection.Id);
                 throw;
             }
+
+            return connection;
         }
 
         public async Task OnDisconnected(WebSocket socket, Exception exception)
@@ -73,11 +86,6 @@ namespace MorseL.Sockets
         public virtual async Task OnDisconnectedAsync(Connection connection, Exception exception)
         {
             await Task.CompletedTask;
-        }
-
-        public Task ReceiveAsync(WebSocket socket, WebSocketReceiveResult result, string serializedInvocationDescriptor)
-        {
-            return ReceiveAsync(WebSocketConnectionManager.GetConnection(socket), serializedInvocationDescriptor);
         }
 
         public abstract Task ReceiveAsync(Connection connection, string serializedInvocationDescriptor);

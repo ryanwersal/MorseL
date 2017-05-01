@@ -1,7 +1,7 @@
-using System.Net.WebSockets;
 using System.Threading.Tasks;
+using MorseL.Shared.Tests;
 using MorseL.Sockets;
-using MorseL.Tests.Helpers;
+using MorseL.Sockets.Middleware;
 using Xunit;
 
 namespace MorseL.Tests
@@ -34,10 +34,10 @@ namespace MorseL.Tests
             {
                 var socket = new FakeSocket();
 
-                _manager.AddSocket(socket);
-                var id = _manager.GetId(socket);
+                var connection = _manager.AddConnection(new WebSocketChannel(socket, new IMiddleware[] {}));
+                var id = _manager.GetId(connection);
 
-                Assert.Same(socket, ((WebSocketChannel)_manager.GetConnectionById(id).Socket).Socket);
+                Assert.Same(socket, ((WebSocketChannel)_manager.GetConnectionById(id).Channel).Socket);
             }
         }
 
@@ -52,7 +52,7 @@ namespace MorseL.Tests
             [Fact]
             public void WhenOneSocket_ShouldReturnOne()
             {
-                _manager.AddSocket(new FakeSocket());
+                _manager.AddConnection(new WebSocketChannel(new FakeSocket(), new IMiddleware[] { }));
 
                 Assert.Equal(1, _manager.GetAll().Count);
             }
@@ -63,7 +63,7 @@ namespace MorseL.Tests
             [Fact]
             public void WhenNull_ShouldReturnNull()
             {
-                var id = _manager.GetId((WebSocket)null);
+                var id = _manager.GetId((Connection)null);
 
                 Assert.Null(id);
             }
@@ -71,7 +71,7 @@ namespace MorseL.Tests
             [Fact]
             public void WhenUntrackedInstance_ShouldReturnNull()
             {
-                var id = _manager.GetId(new FakeSocket());
+                var id = _manager.GetId(new Connection("", null));
 
                 Assert.Null(id);
             }
@@ -80,9 +80,9 @@ namespace MorseL.Tests
             public void WhenTrackedInstance_ShouldReturnId()
             {
                 var socket = new FakeSocket();
-                _manager.AddSocket(socket);
+                var connection = _manager.AddConnection(new WebSocketChannel(new FakeSocket(), new IMiddleware[] { }));
 
-                var id = _manager.GetId(socket);
+                var id = _manager.GetId(connection);
 
                 Assert.NotNull(id);
             }
@@ -93,7 +93,7 @@ namespace MorseL.Tests
             [Fact(Skip = "At the moment the implementation allows adding null references")]
             public void WhenNull_ShouldNotNotContainSocket()
             {
-                _manager.AddSocket(null);
+                _manager.AddConnection(null);
 
                 Assert.Equal(0, _manager.GetAll().Count);
             }
@@ -101,7 +101,7 @@ namespace MorseL.Tests
             [Fact]
             public void WhenInstance_ShouldContainSocket()
             {
-                _manager.AddSocket(new FakeSocket());
+                _manager.AddConnection(new WebSocketChannel(new FakeSocket(), new IMiddleware[] { }));
 
                 Assert.Equal(1, _manager.GetAll().Count);
             }

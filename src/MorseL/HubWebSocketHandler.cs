@@ -153,7 +153,7 @@ namespace MorseL
 
             if (invocationDescriptor == null)
             {
-                await connection.Socket.SendMessageAsync(new Message()
+                await connection.Channel.SendMessageAsync(new Message()
                 {
                     MessageType = MessageType.Text,
                     Data = $"Cannot find method to match inbound request"
@@ -164,7 +164,7 @@ namespace MorseL
             HubMethodDescriptor descriptor;
             if (!_methods.TryGetValue(invocationDescriptor.MethodName, out descriptor))
             {
-                await connection.Socket.SendMessageAsync(new Message()
+                await connection.Channel.SendMessageAsync(new Message()
                 {
                     MessageType = MessageType.Text,
                     Data = $"Cannot find method {invocationDescriptor.MethodName}"
@@ -180,7 +180,7 @@ namespace MorseL
                 Data = Json.SerializeObject(result)
             };
 
-            await connection.Socket.SendMessageAsync(message);
+            await connection.Channel.SendMessageAsync(message);
         }
 
         private async Task<InvocationResultDescriptor> Invoke(HubMethodDescriptor descriptor, Connection connection, InvocationDescriptor invocationDescriptor)

@@ -1,4 +1,5 @@
 "use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
 var InvocationDescriptor = (function () {
     function InvocationDescriptor(methodName, args) {
         this.MethodName = methodName;

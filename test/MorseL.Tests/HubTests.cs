@@ -13,8 +13,11 @@ using Moq;
 using MorseL.Client;
 using MorseL.Common;
 using MorseL.Common.Serialization;
+using MorseL.Extensions;
+using MorseL.Shared.Tests;
 using MorseL.Sockets;
 using Xunit;
+using Connection = MorseL.Sockets.Connection;
 
 namespace MorseL.Tests
 {
@@ -28,13 +31,13 @@ namespace MorseL.Tests
         {
             var serviceProvider = CreateServiceProvider();
             var actualHub = serviceProvider.GetRequiredService<HubWebSocketHandler<TestHub>>();
-            var webSocket = new FakeWebSocket();
+            var webSocket = new LinkedFakeSocket();
 
-            await actualHub.OnConnected(webSocket, new DefaultHttpContext());
+            var connection = await CreateHubConnectionFromSocket(actualHub, webSocket);
 
-            await SendMessageToSocketAsync(actualHub, webSocket, nameof(TestHub.VoidMethod), null);
+            await SendMessageToSocketAsync(actualHub, connection, nameof(TestHub.VoidMethod), null);
 
-            var result = await ReadMessageFromSocketAsync<object>(webSocket);
+            var result = await ReadInvocationResultFromSocket<object>(webSocket);
 
             Assert.NotNull(result);
             Assert.Null(result.Result);
@@ -45,13 +48,13 @@ namespace MorseL.Tests
         {
             var serviceProvider = CreateServiceProvider();
             var actualHub = serviceProvider.GetRequiredService<HubWebSocketHandler<TestHub>>();
-            var webSocket = new FakeWebSocket();
+            var webSocket = new LinkedFakeSocket();
 
-            await actualHub.OnConnected(webSocket, new DefaultHttpContext());
+            var connection = await CreateHubConnectionFromSocket(actualHub, webSocket);
 
-            await SendMessageToSocketAsync(actualHub, webSocket, nameof(TestHub.VoidMethodAsync), null);
+            await SendMessageToSocketAsync(actualHub, connection, nameof(TestHub.VoidMethodAsync), null);
 
-            var result = await ReadMessageFromSocketAsync<object>(webSocket);
+            var result = await ReadInvocationResultFromSocket<object>(webSocket);
 
             Assert.NotNull(result);
             Assert.Null(result.Result);
@@ -62,13 +65,13 @@ namespace MorseL.Tests
         {
             var serviceProvider = CreateServiceProvider();
             var actualHub = serviceProvider.GetRequiredService<HubWebSocketHandler<TestHub>>();
-            var webSocket = new FakeWebSocket();
+            var webSocket = new LinkedFakeSocket();
 
-            await actualHub.OnConnected(webSocket, new DefaultHttpContext());
+            var connection = await CreateHubConnectionFromSocket(actualHub, webSocket);
 
-            await SendMessageToSocketAsync(actualHub, webSocket, nameof(TestHub.IntMethod), null);
+            await SendMessageToSocketAsync(actualHub, connection, nameof(TestHub.IntMethod), null);
 
-            var result = await ReadMessageFromSocketAsync<int>(webSocket);
+            var result = await ReadInvocationResultFromSocket<int>(webSocket);
 
             Assert.NotNull(result);
             Assert.Equal(result.Result, TestHub.IntResult);
@@ -79,13 +82,13 @@ namespace MorseL.Tests
         {
             var serviceProvider = CreateServiceProvider();
             var actualHub = serviceProvider.GetRequiredService<HubWebSocketHandler<TestHub>>();
-            var webSocket = new FakeWebSocket();
+            var webSocket = new LinkedFakeSocket();
 
-            await actualHub.OnConnected(webSocket, new DefaultHttpContext());
+            var connection = await CreateHubConnectionFromSocket(actualHub, webSocket);
 
-            await SendMessageToSocketAsync(actualHub, webSocket, nameof(TestHub.IntMethodAsync), null);
+            await SendMessageToSocketAsync(actualHub, connection, nameof(TestHub.IntMethodAsync), null);
 
-            var result = await ReadMessageFromSocketAsync<int>(webSocket);
+            var result = await ReadInvocationResultFromSocket<int>(webSocket);
 
             Assert.NotNull(result);
             Assert.Equal(result.Result, TestHub.IntResult);
@@ -96,13 +99,13 @@ namespace MorseL.Tests
         {
             var serviceProvider = CreateServiceProvider();
             var actualHub = serviceProvider.GetRequiredService<HubWebSocketHandler<TestHub>>();
-            var webSocket = new FakeWebSocket();
+            var webSocket = new LinkedFakeSocket();
 
-            await actualHub.OnConnected(webSocket, new DefaultHttpContext());
+            var connection = await CreateHubConnectionFromSocket(actualHub, webSocket);
 
-            await SendMessageToSocketAsync(actualHub, webSocket, nameof(TestHub.StringMethod), null);
+            await SendMessageToSocketAsync(actualHub, connection, nameof(TestHub.StringMethod), null);
 
-            var result = await ReadMessageFromSocketAsync<string>(webSocket);
+            var result = await ReadInvocationResultFromSocket<string>(webSocket);
 
             Assert.NotNull(result);
             Assert.Equal(result.Result, TestHub.StringResult);
@@ -113,13 +116,13 @@ namespace MorseL.Tests
         {
             var serviceProvider = CreateServiceProvider();
             var actualHub = serviceProvider.GetRequiredService<HubWebSocketHandler<TestHub>>();
-            var webSocket = new FakeWebSocket();
+            var webSocket = new LinkedFakeSocket();
 
-            await actualHub.OnConnected(webSocket, new DefaultHttpContext());
+            var connection = await CreateHubConnectionFromSocket(actualHub, webSocket);
 
-            await SendMessageToSocketAsync(actualHub, webSocket, nameof(TestHub.StringMethodAsync), null);
+            await SendMessageToSocketAsync(actualHub, connection, nameof(TestHub.StringMethodAsync), null);
 
-            var result = await ReadMessageFromSocketAsync<string>(webSocket);
+            var result = await ReadInvocationResultFromSocket<string>(webSocket);
 
             Assert.NotNull(result);
             Assert.Equal(result.Result, TestHub.StringResult);
@@ -130,13 +133,13 @@ namespace MorseL.Tests
         {
             var serviceProvider = CreateServiceProvider();
             var actualHub = serviceProvider.GetRequiredService<HubWebSocketHandler<TestHub>>();
-            var webSocket = new FakeWebSocket();
+            var webSocket = new LinkedFakeSocket();
 
-            await actualHub.OnConnected(webSocket, new DefaultHttpContext());
+            var connection = await CreateHubConnectionFromSocket(actualHub, webSocket);
 
-            await SendMessageToSocketAsync(actualHub, webSocket, nameof(TestHub.FloatMethod), null);
+            await SendMessageToSocketAsync(actualHub, connection, nameof(TestHub.FloatMethod), null);
 
-            var result = await ReadMessageFromSocketAsync<float>(webSocket);
+            var result = await ReadInvocationResultFromSocket<float>(webSocket);
 
             Assert.NotNull(result);
             Assert.Equal(result.Result, TestHub.FloatResult);
@@ -147,19 +150,32 @@ namespace MorseL.Tests
         {
             var serviceProvider = CreateServiceProvider();
             var actualHub = serviceProvider.GetRequiredService<HubWebSocketHandler<TestHub>>();
-            var webSocket = new FakeWebSocket();
+            var webSocket = new LinkedFakeSocket();
 
-            await actualHub.OnConnected(webSocket, new DefaultHttpContext());
+            var connection = await CreateHubConnectionFromSocket(actualHub, webSocket);
 
-            await SendMessageToSocketAsync(actualHub, webSocket, nameof(TestHub.FloatMethod), null);
+            await SendMessageToSocketAsync(actualHub, connection, nameof(TestHub.FloatMethod), null);
 
-            var result = await ReadMessageFromSocketAsync<float>(webSocket);
+            var result = await ReadInvocationResultFromSocket<float>(webSocket);
 
             Assert.NotNull(result);
             Assert.Equal(result.Result, TestHub.FloatResult);
         }
 
-        private async Task SendMessageToSocketAsync(WebSocketHandler handler, WebSocket webSocket, string methodName, params object[] args)
+        private async Task<Connection> CreateHubConnectionFromSocket(HubWebSocketHandler<TestHub> actualHub, LinkedFakeSocket webSocket)
+        {
+            var connection = await actualHub.OnConnected(webSocket, new DefaultHttpContext());
+
+            // Receive the connection message
+            var connectMessage = await ReadMessageFromSocketAsync(webSocket);
+
+            Assert.NotNull(connectMessage);
+            Assert.NotNull(connectMessage.Data);
+            Assert.NotNull(Guid.Parse(connectMessage.Data));
+            return connection;
+        }
+
+        private async Task SendMessageToSocketAsync(WebSocketHandler handler, Connection connection, string methodName, params object[] args)
         {
             var serializedMessage = Json.SerializeObject(new InvocationDescriptor()
             {
@@ -167,13 +183,14 @@ namespace MorseL.Tests
                 MethodName = methodName,
                 Arguments = args
             });
-            await handler.ReceiveAsync(webSocket, null, serializedMessage);
+            await handler.ReceiveAsync(connection, serializedMessage);
         }
 
-        private async Task<InvocationResultDescriptor> ReadMessageFromSocketAsync<TReturnType>(WebSocket socket)
+        private async Task<Message> ReadMessageFromSocketAsync(WebSocket socket)
         {
             ArraySegment<byte> buffer = new ArraySegment<byte>(new byte[1024 * 4]);
-            string serializedInvocationDescriptor;
+            string serializedMessage;
+
             using (var ms = new MemoryStream())
             {
                 WebSocketReceiveResult result;
@@ -188,13 +205,18 @@ namespace MorseL.Tests
 
                 using (var reader = new StreamReader(ms, Encoding.UTF8))
                 {
-                    serializedInvocationDescriptor = await reader.ReadToEndAsync().ConfigureAwait(false);
+                    serializedMessage = await reader.ReadToEndAsync().ConfigureAwait(false);
                 }
             }
 
+            return Json.Deserialize<Message>(serializedMessage);
+        }
+
+        private async Task<InvocationResultDescriptor> ReadInvocationResultFromSocket<TReturnType>(WebSocket socket)
+        {
+            var message = await ReadMessageFromSocketAsync(socket);
             var pendingCalls = new Dictionary<string, InvocationRequest>();
             pendingCalls.Add(_nextId.ToString(), new InvocationRequest(new CancellationToken(), typeof(TReturnType)));
-            var message = Json.Deserialize<Message>(serializedInvocationDescriptor);
             return Json.DeserializeInvocationResultDescriptor(message.Data, pendingCalls);
         }
 
@@ -208,61 +230,6 @@ namespace MorseL.Tests
             addServices?.Invoke(services);
 
             return services.BuildServiceProvider();
-        }
-
-        public class FakeWebSocket : WebSocket
-        {
-            public override void Abort() { }
-
-            public override void Dispose() { }
-
-            public override WebSocketCloseStatus? CloseStatus => WebSocketCloseStatus.NormalClosure;
-            public override string CloseStatusDescription => "";
-            public override WebSocketState State => WebSocketState.Open;
-            public override string SubProtocol => "";
-
-            private byte[] _buffer;
-            private int _position = 0;
-
-            public override Task SendAsync(ArraySegment<byte> buffer, WebSocketMessageType messageType, bool endOfMessage,
-                CancellationToken cancellationToken)
-            {
-                _buffer = new byte[buffer.Array.Length];
-                Array.Copy(buffer.Array, buffer.Offset, _buffer, buffer.Offset, buffer.Count);
-                return Task.CompletedTask;
-            }
-
-            public override Task<WebSocketReceiveResult> ReceiveAsync(ArraySegment<byte> buffer, CancellationToken cancellationToken)
-            {
-                WebSocketReceiveResult result;
-
-                var bytesRead = Math.Min(_buffer.Length - _position, buffer.Array.Length);
-                var bytesLeft = _buffer.Length - _position - bytesRead;
-                if (bytesRead > 0)
-                {
-                    result = new WebSocketReceiveResult(bytesRead, WebSocketMessageType.Text, bytesLeft <= 0);
-                }
-                else
-                {
-                    result = new WebSocketReceiveResult(0, WebSocketMessageType.Close, true);
-                }
-
-                Array.Copy(_buffer, _position, buffer.Array, 0, bytesRead);
-                _position += bytesRead;
-
-                return Task.FromResult(result);
-            }
-
-            public override Task CloseOutputAsync(WebSocketCloseStatus closeStatus, string statusDescription,
-                CancellationToken cancellationToken)
-            {
-                return Task.CompletedTask;
-            }
-
-            public override Task CloseAsync(WebSocketCloseStatus closeStatus, string statusDescription, CancellationToken cancellationToken)
-            {
-                return Task.CompletedTask;
-            }
         }
 
         public class TestHub : Hub

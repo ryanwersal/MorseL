@@ -3,9 +3,9 @@ using System.Net.WebSockets;
 using System.Threading;
 using System.Threading.Tasks;
 
-namespace MorseL.Tests.Helpers
+namespace MorseL.Shared.Tests
 {
-    internal class FakeSocket : WebSocket
+    public class FakeSocket : WebSocket
     {
         public override void Abort()
         {
