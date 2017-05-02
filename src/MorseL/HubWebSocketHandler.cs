@@ -67,7 +67,7 @@ namespace MorseL
             }
             catch (Exception ex)
             {
-                _logger.LogError(0, ex, "Error when invoking OnConnectedAsync on hub.");
+                _logger.LogError(0, ex, $"Error when invoking OnConnectedAsync on hub for {connection.Id}");
                 throw;
             }
         }
@@ -95,7 +95,7 @@ namespace MorseL
             }
             catch (Exception ex)
             {
-                _logger.LogError(0, ex, "Error when invoking OnDisconnectedAsync on hub.");
+                _logger.LogError(0, ex, $"Error when invoking OnDisconnectedAsync on hub for {connection.Id}");
                 throw;
             }
         }
@@ -156,7 +156,7 @@ namespace MorseL
                 await connection.Channel.SendMessageAsync(new Message()
                 {
                     MessageType = MessageType.Text,
-                    Data = $"Cannot find method to match inbound request"
+                    Data = $"Cannot find method to match inbound request for {connection.Id}"
                 }).ConfigureAwait(false);
                 return;
             }
@@ -197,7 +197,7 @@ namespace MorseL
 
             if (!await AuthorizeAsync(descriptor.AuthorizeData, connection.User, null))
             {
-                _logger.LogError($"Unauthorized access for Hub method '{methodName}'");
+                _logger.LogError($"Unauthorized access for Hub method '{methodName}' for {connection.Id}");
                 invocationResult.Error = $"Unauthorized access for Hub method '{methodName}'";
                 return invocationResult;
             }
@@ -234,12 +234,12 @@ namespace MorseL
                 }
                 catch (TargetInvocationException ex)
                 {
-                    _logger.LogError(0, ex, "Failed to invoke hub method");
+                    _logger.LogError(0, ex, $"Failed to invoke hub method for {connection.Id}");
                     invocationResult.Error = ex.InnerException.Message;
                 }
                 catch (Exception ex)
                 {
-                    _logger.LogError(0, ex, "Failed to invoke hub method");
+                    _logger.LogError(0, ex, $"Failed to invoke hub method for {connection.Id}");
                     invocationResult.Error = ex.Message;
                 }
                 finally
