@@ -1,0 +1,8 @@
+{
+  "profiles": {
+    "Client": {
+      "commandName": "Project",
+      "commandLineArgs": "--name=\"Client 1/1\" --host=localhost --port=5000 --use-ssl=false"
+    }
+  }
+}
