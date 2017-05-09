@@ -195,7 +195,10 @@ namespace MorseL
 
             // TODO: Authenticate on method invocation?
 
-            if (!await AuthorizeAsync(descriptor.AuthorizeData, connection.User, null))
+            // TODO: This abuses the resource context in authorize to pass the connection ID
+            // Come up with a better way to retain contextual information of the user being authenticated?
+            // Perhaps add a connection ID claim to the user? :/
+            if (!await AuthorizeAsync(descriptor.AuthorizeData, connection.User, connection.Id))
             {
                 _logger.LogError($"Unauthorized access for Hub method '{methodName}' for {connection.Id}");
                 invocationResult.Error = $"Unauthorized access for Hub method '{methodName}'";
