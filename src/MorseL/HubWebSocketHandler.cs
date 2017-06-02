@@ -90,13 +90,15 @@ namespace MorseL
                         hubActivator.Release(hub);
                     }
                 }
-
-                await _scaleoutBackPlane.UnRegister(connection);
             }
             catch (Exception ex)
             {
                 _logger.LogError(0, ex, $"Error when invoking OnDisconnectedAsync on hub for {connection.Id}");
                 throw;
+            }
+            finally
+            {
+                await _scaleoutBackPlane.UnRegister(connection);
             }
         }
 
