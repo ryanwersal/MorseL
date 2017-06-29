@@ -15,6 +15,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\MorseL.Common\MorseL.Common.csproj" />
+    <ProjectReference Include="..\MorseL.Diagnostics\MorseL.Diagnostics.csproj" />
     <ProjectReference Include="..\MorseL.Scaleout\MorseL.Scaleout.csproj" />
     <ProjectReference Include="..\MorseL.Sockets\MorseL.Sockets.csproj" />
   </ItemGroup>

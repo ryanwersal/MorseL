@@ -1,0 +1,8 @@
+{
+  "profiles": {
+    "Orchestrator": {
+      "commandName": "Project",
+      "commandLineArgs": "--clients=10"
+    }
+  }
+}

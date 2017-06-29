@@ -11,6 +11,7 @@ using Nito.AsyncEx.Synchronous;
 using SuperSocket.ClientEngine;
 using MorseL.Common;
 using MorseL.Common.Serialization;
+using MorseL.Diagnostics;
 using WebSocketMessageType = MorseL.Client.WebSockets.WebSocketMessageType;
 using WebSocketState = WebSocket4Net.WebSocketState;
 
@@ -110,6 +111,7 @@ namespace MorseL.Client
             _handlers.AddOrUpdate(methodName, invocationHandler, (_, __) => invocationHandler);
         }
 
+        public Task Invoke(string methodName, params object[] args) => Invoke<object>(methodName, CancellationToken.None, args);
         public Task<T> Invoke<T>(string methodName, params object[] args) => Invoke<T>(methodName, CancellationToken.None, args);
         public async Task<T> Invoke<T>(string methodName, CancellationToken cancellationToken, params object[] args) => (T)await Invoke(methodName, typeof(T), cancellationToken, args);
         public Task<object> Invoke(string methodName, Type returnType, params object[] args) => Invoke(methodName, returnType, CancellationToken.None, args);
@@ -139,11 +141,17 @@ namespace MorseL.Client
                 {
                     if (transformIterator.MoveNext())
                     {
-                        await transformIterator.Current.SendAsync(data, transformDelegator).ConfigureAwait(false);
+                        using (_logger.Tracer($"Middleware[{transformIterator.Current.GetType()}].SendAsync(...)"))
+                        {
+                            await transformIterator.Current.SendAsync(data, transformDelegator).ConfigureAwait(false);
+                        }
                     }
                     else
                     {
-                        await _clientWebSocket.SendAsync(data, CancellationToken.None).ConfigureAwait(false);
+                        using (_logger.Tracer("Connection.SendAsync(...)"))
+                        {
+                            await _clientWebSocket.SendAsync(data, CancellationToken.None).ConfigureAwait(false);
+                        }
                     }
                 };
                 await transformDelegator
@@ -216,11 +224,17 @@ namespace MorseL.Client
                     {
                         if (receiveIterator.MoveNext())
                         {
-                            await receiveIterator.Current.RecieveAsync(transformedMessage, receiveDelegator).ConfigureAwait(false);
+                            using (_logger.Tracer($"Middleware[{receiveIterator.Current.GetType()}].RecieveAsync(...)"))
+                            {
+                                await receiveIterator.Current.RecieveAsync(transformedMessage, receiveDelegator).ConfigureAwait(false);
+                            }
                         }
                         else
                         {
-                            await InternalReceive(transformedMessage, handleMessage).ConfigureAwait(false);
+                            using (_logger.Tracer("Connection.InternalReceive(...)"))
+                            {
+                                await InternalReceive(transformedMessage, handleMessage).ConfigureAwait(false);
+                            }
                         }
                     };
 

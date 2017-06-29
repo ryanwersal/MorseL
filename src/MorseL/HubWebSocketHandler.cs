@@ -9,6 +9,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using MorseL.Common;
 using MorseL.Common.Serialization;
+using MorseL.Diagnostics;
 using MorseL.Internal;
 using MorseL.Scaleout;
 using MorseL.Sockets;
@@ -67,7 +68,7 @@ namespace MorseL
             }
             catch (Exception ex)
             {
-                _logger.LogError(0, ex, "Error when invoking OnConnectedAsync on hub.");
+                _logger.LogError(0, ex, $"Error when invoking OnConnectedAsync on hub for {connection.Id}");
                 throw;
             }
         }
@@ -90,13 +91,15 @@ namespace MorseL
                         hubActivator.Release(hub);
                     }
                 }
-
-                await _scaleoutBackPlane.UnRegister(connection);
             }
             catch (Exception ex)
             {
-                _logger.LogError(0, ex, "Error when invoking OnDisconnectedAsync on hub.");
+                _logger.LogError(0, ex, $"Error when invoking OnDisconnectedAsync on hub for {connection.Id}");
                 throw;
+            }
+            finally
+            {
+                await _scaleoutBackPlane.UnRegister(connection);
             }
         }
 
@@ -156,7 +159,7 @@ namespace MorseL
                 await connection.Channel.SendMessageAsync(new Message()
                 {
                     MessageType = MessageType.Text,
-                    Data = $"Cannot find method to match inbound request"
+                    Data = $"Cannot find method to match inbound request for {connection.Id}"
                 }).ConfigureAwait(false);
                 return;
             }
@@ -167,7 +170,7 @@ namespace MorseL
                 await connection.Channel.SendMessageAsync(new Message()
                 {
                     MessageType = MessageType.Text,
-                    Data = $"Cannot find method {invocationDescriptor.MethodName}"
+                    Data = $"Cannot find method {invocationDescriptor.MethodName} to match inbound request for {connection.Id}"
                 }).ConfigureAwait(false);
                 return;
             }
@@ -193,62 +196,68 @@ namespace MorseL
             var methodExecutor = descriptor.MethodExecutor;
             var methodName = methodExecutor.MethodInfo.Name;
 
-            // TODO: Authenticate on method invocation?
-
-            if (!await AuthorizeAsync(descriptor.AuthorizeData, connection.User, null))
+            using (_logger.Tracer($"{this.GetType()}.Invoke({methodName}, ...)"))
             {
-                _logger.LogError($"Unauthorized access for Hub method '{methodName}'");
-                invocationResult.Error = $"Unauthorized access for Hub method '{methodName}'";
-                return invocationResult;
-            }
+                // TODO: Authenticate on method invocation?
 
-            // TODO: Should we challenge? What does that mean in the context of hub invocation?
-
-            using (var scope = _serviceScopeFactory.CreateScope())
-            {
-                var hubActivator = scope.ServiceProvider.GetRequiredService<IHubActivator<THub, TClient>>();
-                var hub = hubActivator.Create();
-
-                try
+                // TODO: This abuses the resource context in authorize to pass the connection ID
+                // Come up with a better way to retain contextual information of the user being authenticated?
+                // Perhaps add a connection ID claim to the user? :/
+                if (!await AuthorizeAsync(descriptor.AuthorizeData, connection.User, connection.Id))
                 {
-                    InitializeHub(hub, connection);
+                    _logger.LogError($"Unauthorized access for Hub method '{methodName}' for {connection.Id}");
+                    invocationResult.Error = $"Unauthorized access for Hub method '{methodName}'";
+                    return invocationResult;
+                }
 
-                    object result = null;
-                    if (methodExecutor.IsMethodAsync)
+                // TODO: Should we challenge? What does that mean in the context of hub invocation?
+
+                using (var scope = _serviceScopeFactory.CreateScope())
+                {
+                    var hubActivator = scope.ServiceProvider.GetRequiredService<IHubActivator<THub, TClient>>();
+                    var hub = hubActivator.Create();
+
+                    try
                     {
-                        if (methodExecutor.TaskGenericType == null)
+                        InitializeHub(hub, connection);
+
+                        object result = null;
+                        if (methodExecutor.IsMethodAsync)
                         {
-                            await (Task)methodExecutor.Execute(hub, invocationDescriptor.Arguments);
+                            if (methodExecutor.TaskGenericType == null)
+                            {
+                                await (Task) methodExecutor.Execute(hub, invocationDescriptor.Arguments);
+                            }
+                            else
+                            {
+                                result = await methodExecutor.ExecuteAsync(hub, invocationDescriptor.Arguments);
+                            }
                         }
                         else
                         {
-                            result = await methodExecutor.ExecuteAsync(hub, invocationDescriptor.Arguments);
+                            result = methodExecutor.Execute(hub, invocationDescriptor.Arguments);
                         }
+
+                        invocationResult.Result = result;
                     }
-                    else
+                    catch (TargetInvocationException ex)
                     {
-                        result = methodExecutor.Execute(hub, invocationDescriptor.Arguments);
+                        _logger.LogError(0, ex, $"Failed to invoke hub method for {connection.Id}");
+                        invocationResult.Error = ex.InnerException.Message;
                     }
+                    catch (Exception ex)
+                    {
+                        _logger.LogError(0, ex, $"Failed to invoke hub method for {connection.Id}");
+                        invocationResult.Error = ex.Message;
+                    }
+                    finally
+                    {
+                        hubActivator.Release(hub);
+                    }
+                }
 
-                    invocationResult.Result = result;
-                }
-                catch (TargetInvocationException ex)
-                {
-                    _logger.LogError(0, ex, "Failed to invoke hub method");
-                    invocationResult.Error = ex.InnerException.Message;
-                }
-                catch (Exception ex)
-                {
-                    _logger.LogError(0, ex, "Failed to invoke hub method");
-                    invocationResult.Error = ex.Message;
-                }
-                finally
-                {
-                    hubActivator.Release(hub);
-                }
+                return invocationResult;
             }
-
-            return invocationResult;
         }
 
         private async Task<bool> AuthorizeAsync(IAuthorizeData[] authorizeData, ClaimsPrincipal user, object context)

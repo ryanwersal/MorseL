@@ -1,5 +1,5 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
-  <Import Project="../../version.props"/>
+  <Import Project="../../version.props" />
 
   <PropertyGroup>
     <TargetFramework>netstandard1.6</TargetFramework>
@@ -8,8 +8,7 @@
 
   <ItemGroup>
     <PackageReference Include="Nito.AsyncEx" Version="5.0.0-pre-02" />
-    <PackageReference Include="SuperSocket.ClientEngine.Core" Version="0.8.0.8" />
-    <PackageReference Include="WebSocket4Net" Version="0.15.0-beta6" />
+    <PackageReference Include="WebSocket4Net" Version="0.15.0-beta7" />
   </ItemGroup>
 
 </Project>

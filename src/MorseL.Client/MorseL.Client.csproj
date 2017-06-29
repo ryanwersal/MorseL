@@ -19,6 +19,7 @@
   <ItemGroup>
     <ProjectReference Include="..\MorseL.Client.WebSockets\MorseL.Client.WebSockets.csproj" />
     <ProjectReference Include="..\MorseL.Common\MorseL.Common.csproj" />
+    <ProjectReference Include="..\MorseL.Diagnostics\MorseL.Diagnostics.csproj" />
   </ItemGroup>
 
 </Project>
