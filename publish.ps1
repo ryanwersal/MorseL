@@ -8,6 +8,7 @@ param(
 $projects = @(
     "MorseL",
     "MorseL.Common",`
+    "MorseL.Diagnostics",
     "MorseL.Client",
     "MorseL.Sockets",
     "MorseL.Scaleout",

@@ -3,6 +3,7 @@ using System.Diagnostics;
 using System.Security.Cryptography.X509Certificates;
 using System.Text;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Logging;
 using MorseL.Client;
 using MorseL.Client.Middleware;
 using MorseL.Client.WebSockets;
@@ -41,12 +42,16 @@ public class Program
 
     public static async Task StartConnectionAsync()
     {
-        _connection = new Connection("wss://localhost:5001/chat", securityConfig: option =>
+        _connection = new Connection("ws://localhost:5000/chat", config: option =>
+        {
+            option.EnableAutoSendPing = true;
+            option.AutoSendPingIntervalSeconds = 5;
+        }, securityConfig: option =>
         {
             option.Certificates.Add(new X509Certificate2("client.pfx"));
             option.AllowUnstrustedCertificate = true;
             option.AllowNameMismatchCertificate = true;
-        });
+        }, logger: new LoggerFactory().AddConsole().CreateLogger<Program>());
 
         _connection.AddMiddleware(new Middleware());
 

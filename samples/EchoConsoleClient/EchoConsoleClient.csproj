@@ -6,6 +6,10 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.Logging.Console" Version="1.1.1" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\..\src\MorseL.Client\MorseL.Client.csproj" />
     <ProjectReference Include="..\..\src\MorseL.Common\MorseL.Common.csproj" />
     <ProjectReference Include="..\..\src\MorseL\MorseL.csproj" />

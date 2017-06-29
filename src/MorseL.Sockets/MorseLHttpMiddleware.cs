@@ -9,6 +9,7 @@ using System.Threading.Tasks;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using MorseL.Diagnostics;
 using MorseL.Sockets.Internal;
 using MorseL.Sockets.Middleware;
 
@@ -66,14 +67,15 @@ namespace MorseL.Sockets
                 }
                 catch (Exception exception)
                 {
-                    _logger.LogError(exception.Message);
+                    _logger.LogWarning(exception.Message);
+
                     try
                     {
                         await handler.OnDisconnected(socket, exception);
                     }
                     catch (WebSocketException webSocketException)
                     {
-                        _logger.LogError(webSocketException.Message);
+                        _logger.LogWarning(webSocketException.Message);
                     }
                 }
 
@@ -108,7 +110,10 @@ namespace MorseL.Sockets
                     {
                         if (iterator.MoveNext())
                         {
-                            await iterator.Current.ReceiveAsync(context, delegator).ConfigureAwait(false);
+                            using (_logger.Tracer($"Middleware[{iterator.Current.GetType()}].ReceiveAsync(...)"))
+                            {
+                                await iterator.Current.ReceiveAsync(context, delegator).ConfigureAwait(false);
+                            }
                         }
                         else
                         {
@@ -117,7 +122,10 @@ namespace MorseL.Sockets
                                 serializedInvocationDescriptor = await reader.ReadToEndAsync().ConfigureAwait(false);
                             }
 
-                            handleMessage(result, serializedInvocationDescriptor);
+                            using (_logger.Tracer("Receive.handleMessage(...)"))
+                            {
+                                handleMessage(result, serializedInvocationDescriptor);
+                            }
                         }
                     };
 
