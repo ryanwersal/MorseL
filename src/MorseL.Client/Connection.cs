@@ -23,7 +23,7 @@ namespace MorseL.Client
 
         private WebSocketClient _clientWebSocket { get; }
         private string Name { get; }
-        private ILogger _logger;
+        private readonly ILogger _logger;
 
         private int _nextId = 0;
 
@@ -71,7 +71,7 @@ namespace MorseL.Client
                             var invocationDescriptor = Json.DeserializeInvocationDescriptor(message.Data, _handlers);
                             if (invocationDescriptor == null)
                             {
-                                _logger.LogDebug("Invocation request for unknown hub method");
+                                _logger?.LogDebug("Invocation request for unknown hub method");
                                 return;
                             }
                             InvokeOn(invocationDescriptor);
@@ -141,14 +141,14 @@ namespace MorseL.Client
                 {
                     if (transformIterator.MoveNext())
                     {
-                        using (_logger.Tracer($"Middleware[{transformIterator.Current.GetType()}].SendAsync(...)"))
+                        using (_logger?.Tracer($"Middleware[{transformIterator.Current.GetType()}].SendAsync(...)"))
                         {
                             await transformIterator.Current.SendAsync(data, transformDelegator).ConfigureAwait(false);
                         }
                     }
                     else
                     {
-                        using (_logger.Tracer("Connection.SendAsync(...)"))
+                        using (_logger?.Tracer("Connection.SendAsync(...)"))
                         {
                             await _clientWebSocket.SendAsync(data, CancellationToken.None).ConfigureAwait(false);
                         }
@@ -224,14 +224,14 @@ namespace MorseL.Client
                     {
                         if (receiveIterator.MoveNext())
                         {
-                            using (_logger.Tracer($"Middleware[{receiveIterator.Current.GetType()}].RecieveAsync(...)"))
+                            using (_logger?.Tracer($"Middleware[{receiveIterator.Current.GetType()}].RecieveAsync(...)"))
                             {
                                 await receiveIterator.Current.RecieveAsync(transformedMessage, receiveDelegator).ConfigureAwait(false);
                             }
                         }
                         else
                         {
-                            using (_logger.Tracer("Connection.InternalReceive(...)"))
+                            using (_logger?.Tracer("Connection.InternalReceive(...)"))
                             {
                                 await InternalReceive(transformedMessage, handleMessage).ConfigureAwait(false);
                             }

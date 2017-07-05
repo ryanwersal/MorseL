@@ -67,7 +67,7 @@ namespace MorseL.Sockets
                 }
                 catch (Exception exception)
                 {
-                    _logger.LogWarning(exception.Message);
+                    _logger?.LogWarning(exception.Message);
 
                     try
                     {
@@ -75,7 +75,7 @@ namespace MorseL.Sockets
                     }
                     catch (WebSocketException webSocketException)
                     {
-                        _logger.LogWarning(webSocketException.Message);
+                        _logger?.LogWarning(webSocketException.Message);
                     }
                 }
 
@@ -110,7 +110,7 @@ namespace MorseL.Sockets
                     {
                         if (iterator.MoveNext())
                         {
-                            using (_logger.Tracer($"Middleware[{iterator.Current.GetType()}].ReceiveAsync(...)"))
+                            using (_logger?.Tracer($"Middleware[{iterator.Current.GetType()}].ReceiveAsync(...)"))
                             {
                                 await iterator.Current.ReceiveAsync(context, delegator).ConfigureAwait(false);
                             }
@@ -122,7 +122,7 @@ namespace MorseL.Sockets
                                 serializedInvocationDescriptor = await reader.ReadToEndAsync().ConfigureAwait(false);
                             }
 
-                            using (_logger.Tracer("Receive.handleMessage(...)"))
+                            using (_logger?.Tracer("Receive.handleMessage(...)"))
                             {
                                 handleMessage(result, serializedInvocationDescriptor);
                             }
