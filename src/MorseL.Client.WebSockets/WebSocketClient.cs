@@ -29,6 +29,8 @@ namespace MorseL.Client.WebSockets
         public Action Connected;
         public Action Closed;
         public Action<Exception> Error;
+        public Action<DataReceivedEventArgs> DataReceived;
+        public Action<MessageReceivedEventArgs> MessageReceived;
 
         public WebSocketClient(string uri, Action<WebSocketClientOption> config=null, Action<SecurityOption> securityConfig=null)
         {
@@ -60,6 +62,14 @@ namespace MorseL.Client.WebSockets
             _internalWebSocket.Error += (sender, args) =>
             {
                 Error?.Invoke(args.Exception);
+            };
+            _internalWebSocket.DataReceived += (sender, args) =>
+            {
+                DataReceived?.Invoke(args);
+            };
+            _internalWebSocket.MessageReceived += (sender, args) =>
+            {
+                MessageReceived?.Invoke(args);
             };
         }
 

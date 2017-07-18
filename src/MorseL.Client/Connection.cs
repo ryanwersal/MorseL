@@ -39,6 +39,8 @@ namespace MorseL.Client
         public event Action Connected;
         public event Action<Exception> Closed;
         public event Action<Exception> Error;
+        public event Action<byte[]> DataReceived;
+        public event Action<string> MessageReceived;
 
         public Connection(string uri, string name = null, Action<WebSocketClientOption> config = null, Action<SecurityOption> securityConfig = null, ILogger logger = null)
         {
@@ -48,6 +50,8 @@ namespace MorseL.Client
             _clientWebSocket.Connected += () => Connected?.Invoke();
             _clientWebSocket.Closed += () => Closed?.Invoke(null);
             _clientWebSocket.Error += e => Error?.Invoke(e);
+            _clientWebSocket.DataReceived += data => DataReceived?.Invoke(data.Data);
+            _clientWebSocket.MessageReceived += message => MessageReceived?.Invoke(message.Message);
         }
 
         public void AddMiddleware(IMiddleware middleware)
