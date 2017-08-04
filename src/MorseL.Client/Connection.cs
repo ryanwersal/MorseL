@@ -202,8 +202,11 @@ namespace MorseL.Client
 
         public async Task DisposeAsync()
         {
-            if (_clientWebSocket.State != WebSocketState.Open) return;
-            await _clientWebSocket.CloseAsync(CancellationToken.None).ConfigureAwait(false);
+            if (_clientWebSocket.State != WebSocketState.Closed)
+            {
+                await _clientWebSocket.CloseAsync(CancellationToken.None).ConfigureAwait(false);
+            }
+
             _clientWebSocket.Dispose();
 
             if (_receiveLoopTask != null)
