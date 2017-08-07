@@ -8,5 +8,7 @@ namespace MorseL
     {
         Task InvokeAsync(string methodName, params object[] args);
         Task SendMessageAsync(Message message);
+        Task Subscribe(string group);
+        Task Unsubscribe(string group);
     }
 }

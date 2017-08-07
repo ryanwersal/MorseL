@@ -1,0 +1,34 @@
+version: '3.1'
+
+services:
+  redis:
+    image: redis
+  backplaned-host-1:
+    image: backplaned-host
+    environment:
+      VIRTUAL_HOST: '0.0.0.0:5000'
+    depends_on:
+      - redis
+    expose:
+      - '5000'
+    ports:
+      - '5001:5000'
+  backplaned-host-2:
+    image: backplaned-host
+    environment:
+      VIRTUAL_HOST: '0.0.0.0:5000'
+    depends_on:
+      - redis
+    expose:
+      - '5000'
+    ports:
+      - '5002:5000'
+  lb:
+    image: 'dockercloud/haproxy:latest'
+    links:
+      - backplaned-host-1
+      - backplaned-host-2
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    ports:
+      - '5000:5000'

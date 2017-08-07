@@ -1,0 +1,109 @@
+﻿<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="utf-8" />
+    <title>Test Page</title>
+</head>
+
+<body>
+    <h1>This should be mapped to "/chat"</h1>
+    <input type=text id="textInput" placeholder="Enter your text" />
+    <input type=text id="connectionId" placeholder="Connection ID" />
+    <input type=text id="targetGroup" placeholder="Group Name" />
+    <button id="sendButton">Send</button>
+    <button id="tellButton">Tell</button>
+    <button id="groupButton">Group</button>
+
+    <ul id="messages"></ul>
+
+    <br />
+
+    <input type=text id="group" placeholder="Group Name" />
+    <button id="subscribeButton">Subscribe</button>
+    <button id="unsubscribeButton">Unsubscribe</button>
+
+    <script data-main="scripts/main" src="MorseL.js"></script>
+
+    <script language="javascript" type="text/javascript">
+        var connection = new MorseL.Connection((location.protocol == "http:" ? "ws" : "wss") + "://0.0.0.0:" + location.port + "/chat");
+
+        connection.addMiddleware({
+            send: function(message, next) {
+                next(btoa(message));
+            },
+            receive: function(message, next) {
+                next(atob(message));
+            }
+        });
+
+        connection.enableLogging = true;
+
+        connection.connectionMethods.onConnected = () => {
+            //optional
+            console.log("You are now connected! Connection ID: " + connection.connectionId);
+        }
+
+        connection.connectionMethods.onDisconnected = () => {
+            //optional
+            console.log("Disconnected!");
+        }
+
+        connection.clientMethods["receiveMessage"] = (socketId, message) => {
+            var messageText = socketId + " said: " + message;
+
+            console.log(messageText);
+            appendItem(list, messageText);
+        };
+
+        connection.start();
+
+        var list = document.getElementById("messages");
+        var button = document.getElementById("sendButton");
+        button.addEventListener("click", function() {
+
+            var input = document.getElementById("textInput");
+            connection.invoke("SendMessage", connection.connectionId, input.value);
+
+            input.value = "";
+        });
+
+        button = document.getElementById("tellButton");
+        button.addEventListener("click", function() {
+            var connectionId = document.getElementById("connectionId");
+            var input = document.getElementById("textInput");
+            connection.invoke("SendTell", connection.connectionId, connectionId.value, input.value);
+
+            input.value = "";
+        });
+
+        button = document.getElementById("groupButton");
+        button.addEventListener("click", function() {
+            var group = document.getElementById("targetGroup");
+            var input = document.getElementById("textInput");
+            connection.invoke("SendGroup", connection.connectionId, group.value, input.value);
+
+            input.value = "";
+        });
+
+        button = document.getElementById("subscribeButton");
+        button.addEventListener("click", function() {
+            var group = document.getElementById("group");
+            connection.invoke("Subscribe", group.value);
+        });
+
+        button = document.getElementById("unsubscribeButton");
+        button.addEventListener("click", function() {
+            var group = document.getElementById("group");
+            connection.invoke("Unsubscribe", group.value);
+        });
+
+        function appendItem(list, message) {
+            var item = document.createElement("li");
+            item.appendChild(document.createTextNode(message));
+            list.appendChild(item);
+        }
+    </script>
+</body>
+
+</html>

@@ -22,11 +22,13 @@ namespace MorseL
             return Task.CompletedTask;
         }
 
+        public IClientInvoker Client { get; set; }
+
         public ClientsDispatcher Clients { get; set; }
 
         public HubCallerContext Context { get; set; }
 
-        public GroupsManager Groups { get; set; }
+        public GroupsDispatcher Groups { get; set; }
 
         public void Dispose()
         {
