@@ -13,12 +13,12 @@ namespace MorseL.Diagnostics
         {
             _logger = logger;
             _message = string.Format(format, args);
-            _logger.LogInformation($"<tracer> [Start]\t\"{_message}\"");
+            _logger.LogTrace($"<tracer> [Start]\t\"{_message}\"");
         }
 
         public void Dispose()
         {
-            _logger.LogInformation($"<tracer> [End]\t\"{_message}\" Elapsed: {(DateTime.Now - _startTime).TotalMilliseconds}ms");
+            _logger.LogTrace($"<tracer> [End]\t\"{_message}\" Elapsed: {(DateTime.Now - _startTime).TotalMilliseconds}ms");
         }
     }
 }
