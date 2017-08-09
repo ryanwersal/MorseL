@@ -14,6 +14,7 @@ using MorseL.Sockets.Internal;
 using MorseL.Sockets.Middleware;
 using Microsoft.Extensions.Options;
 using Nito.AsyncEx.Synchronous;
+using MorseL.Common;
 
 namespace MorseL.Sockets
 {
@@ -113,10 +114,13 @@ namespace MorseL.Sockets
                     {
                         _logger?.LogWarning(webSocketException.Message);
                     }
-                }
 
-                //TODO - investigate the Kestrel exception thrown when this is the last middleware
-                //await _next.Invoke(context);
+                    if (exception is MorseLException)
+                    {
+                        // For now, rethrow morsel exceptions
+                        throw;
+                    }
+                }
             }
         }
 
