@@ -162,6 +162,59 @@ namespace MorseL.Tests
             Assert.Equal(result.Result, TestHub.FloatResult);
         }
 
+        [Theory]
+        [InlineData("methodName1")]
+        [InlineData("methodName2", "some argument")]
+        [InlineData("methodName3", "some argument", 5)]
+        public async void CannotCallNonExistentMethod(string methodName, params object[] arguments)
+        {
+            var serviceProvider = CreateServiceProvider(s => s.Configure<Extensions.MorseLOptions>(o => o.ThrowOnMissingHubMethodRequest = true));
+            var actualHub = serviceProvider.GetRequiredService<HubWebSocketHandler<TestHub>>();
+            var webSocket = new LinkedFakeSocket();
+
+            var connection = await CreateHubConnectionFromSocket(actualHub, webSocket);
+
+            var expectedMethodName = string.IsNullOrWhiteSpace(methodName) ? "[Invalid Method Name]" : methodName;
+            var expectedArgumentList = arguments?.Length > 0 ? String.Join(", ", arguments) : "[No Parameters]";
+
+            var exception = await Assert.ThrowsAsync<MorseLException>(() => SendMessageToSocketAsync(actualHub, connection, methodName, arguments));
+            Assert.Equal($"Invalid method request received from {connection.Id}; method is \"{expectedMethodName}({expectedArgumentList})\"", exception.Message);
+        }
+
+        [Theory]
+        [InlineData("", "some argument", 5)]
+        [InlineData(null, "some other argument", 42)]
+        public async void CannotCallInvalidMethodName(string methodName, params object[] arguments)
+        {
+            var serviceProvider = CreateServiceProvider(s => s.Configure<Extensions.MorseLOptions>(o => o.ThrowOnMissingHubMethodRequest = true));
+            var actualHub = serviceProvider.GetRequiredService<HubWebSocketHandler<TestHub>>();
+            var webSocket = new LinkedFakeSocket();
+
+            var connection = await CreateHubConnectionFromSocket(actualHub, webSocket);
+
+            var expectedMethodName = string.IsNullOrWhiteSpace(methodName) ? "[Invalid Method Name]" : methodName;
+            var expectedArgumentList = arguments?.Length > 0 ? String.Join(", ", arguments) : "[No Parameters]";
+
+            var exception = await Assert.ThrowsAsync<MorseLException>(() => SendMessageToSocketAsync(actualHub, connection, methodName, arguments));
+            Assert.Equal($"Invalid method request received from {connection.Id}; method is \"{expectedMethodName}({expectedArgumentList})\"", exception.Message);
+        }
+
+        [Theory]
+        [InlineData("invalid message 1")]   // Invalid JSON
+        [InlineData("{}")]                  // Valid JSON, invalid message
+                                            // (Note: valid message will work and return invocation error result)
+        public async void CannotCallInvalidInvocationRequest(string message)
+        {
+            var serviceProvider = CreateServiceProvider(s => s.Configure<Extensions.MorseLOptions>(o => o.ThrowOnInvalidMessage = true));
+            var actualHub = serviceProvider.GetRequiredService<HubWebSocketHandler<TestHub>>();
+            var webSocket = new LinkedFakeSocket();
+
+            var connection = await CreateHubConnectionFromSocket(actualHub, webSocket);
+
+            var exception = await Assert.ThrowsAsync<MorseLException>(() => SendMessageToSocketAsync(actualHub, connection, message));
+            Assert.Equal($"Invalid message received \"{message}\" from {connection.Id}", exception.Message);
+        }
+
         private async Task<Connection> CreateHubConnectionFromSocket(HubWebSocketHandler<TestHub> actualHub, LinkedFakeSocket webSocket)
         {
             var connection = await actualHub.OnConnected(webSocket, new DefaultHttpContext());
@@ -184,6 +237,11 @@ namespace MorseL.Tests
                 Arguments = args
             });
             await handler.ReceiveAsync(connection, serializedMessage);
+        }
+
+        private async Task SendMessageToSocketAsync(WebSocketHandler handler, Connection connection, string message)
+        {
+            await handler.ReceiveAsync(connection, message);
         }
 
         private async Task<Message> ReadMessageFromSocketAsync(WebSocket socket)

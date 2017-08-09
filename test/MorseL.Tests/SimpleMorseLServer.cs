@@ -19,9 +19,13 @@ namespace MorseL.Client.WebSockets.Tests
     public class SimpleMorseLServer<THub> where THub : Hub
     {
         private readonly IWebHost _webHost;
+        private static Action<IServiceCollection> ServiceConfigurator;
+        private static Action<IApplicationBuilder, IServiceProvider> ApplicationCongurator;
 
-        public SimpleMorseLServer(IPAddress address, int port)
+        public SimpleMorseLServer(IPAddress address, int port, Action<IServiceCollection> services = null, Action<IApplicationBuilder, IServiceProvider> configure = null)
         {
+            ServiceConfigurator = services;
+            ApplicationCongurator = configure;
             _webHost = new WebHostBuilder()
                 .UseStartup<Startup>()
                 .UseKestrel(options =>
@@ -47,11 +51,12 @@ namespace MorseL.Client.WebSockets.Tests
             public void ConfigureServices(IServiceCollection services)
             {
                 services.AddMorseL();
+                ServiceConfigurator?.Invoke(services);
             }
 
-            public void Configure(IApplicationBuilder app, IServiceProvider serviceProvider,
-                ILoggerFactory loggerFactory)
+            public void Configure(IApplicationBuilder app, IServiceProvider serviceProvider, ILoggerFactory loggerFactory)
             {
+                ApplicationCongurator?.Invoke(app, serviceProvider);
                 app.UseWebSockets();
                 app.MapMorseLHub<THub>("/hub");
             }

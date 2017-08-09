@@ -16,7 +16,7 @@ namespace MorseL.Extensions
 {
     public static class MorseLExtensions
     {
-        public static IMorseLBuilder AddMorseL(this IServiceCollection services, IScaleoutBackPlane scaleoutBackPlane = null)
+        public static IMorseLBuilder AddMorseL(this IServiceCollection services, IScaleoutBackPlane scaleoutBackPlane = null, Action<MorseLOptions> options = null)
         {
             services.AddSingleton(scaleoutBackPlane ?? new ScaleoutBackPlane());
             services.AddSingleton<WebSocketConnectionManager>();
@@ -30,6 +30,8 @@ namespace MorseL.Extensions
                     services.AddTransient(type);
                 }
             }
+
+            services.Configure(options ?? (o => { }));
 
             return new MorseLBuilder(services);
         }

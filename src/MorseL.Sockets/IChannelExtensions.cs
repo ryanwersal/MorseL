@@ -14,8 +14,7 @@ namespace MorseL.Sockets
         public static async Task SendMessageAsync(this IChannel channel, Message message)
         {
             if (channel.State != ChannelState.Open)
-                // TODO : Consider throwing exception?
-                return;
+                throw new MorseLException($"The channel is not open; actual state is ({channel.State})");
 
             // TODO: Serializer settings? Usage is inconsistent in the entire solution.
             var serializedMessage = Json.SerializeObject(message);

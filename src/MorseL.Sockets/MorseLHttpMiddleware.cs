@@ -12,9 +12,41 @@ using Microsoft.Extensions.Logging;
 using MorseL.Diagnostics;
 using MorseL.Sockets.Internal;
 using MorseL.Sockets.Middleware;
+using Microsoft.Extensions.Options;
+using Nito.AsyncEx.Synchronous;
 
 namespace MorseL.Sockets
 {
+    /// <summary>
+    /// <para>Flow of Request</para>
+    /// <para>
+    /// HTTP Request comes into server (kestrel) and gets passed through HTTP middleware
+    /// added to <see cref="Invoke(HttpContext)"/>. The request gets checked for a valid
+    /// websocket and ignored by <see cref="MorseLHttpMiddleware"/> if one is not present.
+    /// </para>
+    /// <para>
+    /// Afterwards, a <see cref="WebSocketHandler"/> is created to manage the life of the
+    /// websocket. The websocket is accepted and passed to
+    /// <see cref="WebSocketHandler.OnConnected(WebSocket, HttpContext)"/> to initiate
+    /// the websockets connection. The receive loop is then started on the websocket,
+    /// looping and calling
+    /// <see cref="WebSocket.ReceiveAsync(ArraySegment{byte}, CancellationToken)"/> to grab
+    /// the next data packet.
+    /// </para>
+    /// <para>
+    /// Each received data packet is checked for a text message or a close message. In the
+    /// event of a close packet,
+    /// <see cref="WebSocketHandler.OnDisconnected(WebSocket, Exception)"/> is called,
+    /// otherwise <see cref="WebSocketHandler.ReceiveAsync(Connection, string)"/> is passed
+    /// the data packet to handle the incoming packet.
+    /// </para>
+    /// <para>Exceptions</para>
+    /// <para>
+    /// Each inbound request marks its own long-running execution flow. The request lasts
+    /// for as long as the web socket is connected and thus exceptions can be thrown and
+    /// observed through out the entire process.
+    /// </para>
+    /// </summary>
     public class MorseLHttpMiddleware
     {
         private readonly ILogger _logger;
@@ -30,7 +62,11 @@ namespace MorseL.Sockets
 
         public async Task Invoke(HttpContext context)
         {
-            if (!context.WebSockets.IsWebSocketRequest) return;
+            if (!context.WebSockets.IsWebSocketRequest)
+            {
+                await _next(context);
+                return;
+            }
 
             using (var serviceScope = context.RequestServices.CreateScope())
             {
@@ -67,7 +103,7 @@ namespace MorseL.Sockets
                 }
                 catch (Exception exception)
                 {
-                    _logger?.LogWarning(exception.Message);
+                    _logger?.LogError(new EventId(), exception, "Exception thrown during receive loop");
 
                     try
                     {
@@ -84,7 +120,7 @@ namespace MorseL.Sockets
             }
         }
 
-        private async Task Receive(WebSocket socket, Connection connection, List<IMiddleware> middleware, Action<WebSocketReceiveResult, string> handleMessage)
+        private async Task Receive(WebSocket socket, Connection connection, List<IMiddleware> middleware, Func<WebSocketReceiveResult, string, Task> handleMessage)
         {
             while (socket.State == WebSocketState.Open)
             {
@@ -94,7 +130,6 @@ namespace MorseL.Sockets
 
                 using (var ms = new MemoryStream())
                 {
-                    // TODO: Consider doing the actual receiving in another task rather than reading all at once
                     do
                     {
                         result = await socket.ReceiveAsync(buffer, CancellationToken.None).ConfigureAwait(false);
@@ -124,14 +159,18 @@ namespace MorseL.Sockets
 
                             using (_logger?.Tracer("Receive.handleMessage(...)"))
                             {
-                                handleMessage(result, serializedInvocationDescriptor);
+                                await handleMessage(result, serializedInvocationDescriptor);
                             }
                         }
                     };
 
                     await delegator
                         .Invoke(context)
-                        .ContinueWith(task => iterator.Dispose())
+                        .ContinueWith(task => {
+                            iterator.Dispose();
+
+                            task.WaitAndUnwrapException();
+                        })
                         .ConfigureAwait(false);
                 }
             }

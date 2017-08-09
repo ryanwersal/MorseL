@@ -71,5 +71,11 @@ namespace MorseL.Sockets
                 _writeLock.Release();
             }
         }
+
+        public async Task DisposeAsync()
+        {
+            await Socket?.CloseAsync(WebSocketCloseStatus.NormalClosure, null, CancellationToken.None);
+            Socket.Dispose();
+        }
     }
 }

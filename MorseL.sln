@@ -36,7 +36,7 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution 
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "MorseL.Client.WebSockets.Tests", "test\MorseL.Client.WebSockets.Tests\MorseL.Client.WebSockets.Tests.csproj", "{7EFD9063-7221-431C-931F-644A9B8005CD}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MorseL.Shared.Tests", "test\MorseL.Shared.Tests\MorseL.Shared.Tests.csproj", "{58A79808-459F-4EC4-987A-57CDFA352307}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "MorseL.Shared.Tests", "test\MorseL.Shared.Tests\MorseL.Shared.Tests.csproj", "{58A79808-459F-4EC4-987A-57CDFA352307}"
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "MorseL.Sockets.Test", "test\MorseL.Sockets.Tests\MorseL.Sockets.Test.csproj", "{8F174739-8946-41B4-B86B-09DD92E2FD3B}"
 EndProject
@@ -52,7 +52,9 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Host", "samples\Stress\Host
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Client", "samples\Stress\Client\Client.csproj", "{ECD4F660-F423-4162-8E94-FFAD7CAE4257}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MorseL.Diagnostics", "src\MorseL.Diagnostics\MorseL.Diagnostics.csproj", "{468253F3-CD39-4687-8EED-DD8FC6FD68FA}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "MorseL.Diagnostics", "src\MorseL.Diagnostics\MorseL.Diagnostics.csproj", "{468253F3-CD39-4687-8EED-DD8FC6FD68FA}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MorseL.Client.Tests", "test\MorseL.Client.Tests\MorseL.Client.Tests.csproj", "{EF76A3EC-F1F4-4926-8598-387C0899F063}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -207,5 +209,9 @@ Global
 		{5FF09D76-A446-4971-8690-AF5A934AB5DB} = {3D2D3437-5505-4EB9-BA89-802301711562}
 		{ECD4F660-F423-4162-8E94-FFAD7CAE4257} = {3D2D3437-5505-4EB9-BA89-802301711562}
 		{468253F3-CD39-4687-8EED-DD8FC6FD68FA} = {29AAA98F-6709-46E9-81FA-2D4F8C1A7195}
+		{EF76A3EC-F1F4-4926-8598-387C0899F063} = {04D2B304-1D1D-49CA-888C-345001F63EF5}
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {17717C7D-D40A-4D92-A3AE-AA95389291CB}
 	EndGlobalSection
 EndGlobal

@@ -14,9 +14,29 @@ using MorseL.Common.Serialization;
 using MorseL.Diagnostics;
 using WebSocketMessageType = MorseL.Client.WebSockets.WebSocketMessageType;
 using WebSocketState = WebSocket4Net.WebSocketState;
+using Newtonsoft.Json.Linq;
 
 namespace MorseL.Client
 {
+    /// <summary>
+    /// <para>
+    /// High Level Overview
+    /// </para>
+    /// <para>
+    /// <see cref="StartAsync"/> is called to establish and initiate a connection
+    /// with a MorseL Hub. This connects the websocket and starts a receive loop
+    /// in an un-awaited task.
+    /// </para>
+    /// <para>
+    /// The receive loops, handled by <see cref="Receive(Func{Message, Task})"/>,
+    /// checks for inbound data packets on the websocket, and when received, parses
+    /// them into <see cref="Message"/> objects and handles them appropriately. As
+    /// this loops is executing in an un-awaited task, exceptions do not get bubbled
+    /// up. In order to handle exceptions, they are added to
+    /// <see cref="_pendingExceptions"/> and an <see cref="AggregateException"/> is
+    /// thrown upon the next <see cref="Invoke"/> call.
+    /// </para>
+    /// </summary>
     public class Connection
     {
         public string ConnectionId { get; set; }
@@ -24,6 +44,8 @@ namespace MorseL.Client
         private WebSocketClient _clientWebSocket { get; }
         private string Name { get; }
         private readonly ILogger _logger;
+
+        private readonly MorseLOptions _options = new MorseLOptions();
 
         private int _nextId = 0;
 
@@ -40,14 +62,25 @@ namespace MorseL.Client
         public event Action<Exception> Closed;
         public event Action<Exception> Error;
 
-        public Connection(string uri, string name = null, Action<WebSocketClientOption> config = null, Action<SecurityOption> securityConfig = null, ILogger logger = null)
+        private IList<Exception> _pendingExceptions = new List<Exception>();
+
+        public Connection(string uri, string name = null, Action<MorseLOptions> options = null, Action<WebSocketClientOption> config = null, Action<SecurityOption> securityConfig = null, ILogger logger = null)
         {
             Name = name;
             _logger = logger;
+            options?.Invoke(_options);
             _clientWebSocket = new WebSocketClient(uri, config, securityConfig);
             _clientWebSocket.Connected += () => Connected?.Invoke();
             _clientWebSocket.Closed += () => Closed?.Invoke(null);
-            _clientWebSocket.Error += e => Error?.Invoke(e);
+
+            // Used to track exceptions and rethrow when able
+            Error += (exception) =>
+            {
+                if (_options.RethrowUnobservedExceptions)
+                {
+                    _pendingExceptions.Add(exception);
+                }
+            };
         }
 
         public void AddMiddleware(IMiddleware middleware)
@@ -55,13 +88,13 @@ namespace MorseL.Client
             _middleware.Add(middleware);
         }
 
-        public Task StartAsync()
+        public async Task StartAsync()
         {
-            Task.Run(async () =>
+            await Task.Run(async () =>
             {
                 await _clientWebSocket.ConnectAsync().ConfigureAwait(false);
 
-                _receiveLoopTask = Receive(message =>
+                _receiveLoopTask = Receive(async message =>
                 {
                     switch (message.MessageType)
                     {
@@ -70,55 +103,136 @@ namespace MorseL.Client
                             break;
 
                         case MessageType.ClientMethodInvocation:
-                            var invocationDescriptor = Json.DeserializeInvocationDescriptor(message.Data, _handlers);
-                            if (invocationDescriptor == null)
+                            InvocationDescriptor invocationDescriptor = null;
+                            try
                             {
-                                _logger?.LogDebug("Invocation request for unknown hub method");
+                                invocationDescriptor = Json.DeserializeInvocationDescriptor(message.Data, _handlers);
+                            }
+                            catch (Exception exception)
+                            {
+                                await HandleUnparseableReceivedInvocationDescriptor(message.Data, exception).ConfigureAwait(false);
                                 return;
                             }
-                            InvokeOn(invocationDescriptor);
+
+                            if (invocationDescriptor == null)
+                            {
+                                // Valid JSON but unparseable into a known, typed invocation descriptor (unknown method name, invalid parameters)
+                                await HandleInvalidReceivedInvocationDescriptor(message.Data).ConfigureAwait(false);
+                                return;
+                            }
+
+                            await InvokeOn(invocationDescriptor).ConfigureAwait(false);
                             break;
 
                         case MessageType.InvocationResult:
-                            var resultDescriptor = Json.DeserializeInvocationResultDescriptor(message.Data,
-                                _pendingCalls);
+                            var resultDescriptor = Json.DeserializeInvocationResultDescriptor(message.Data, _pendingCalls);
                             HandleInvokeResult(resultDescriptor);
                             break;
                     }
                 });
-                _receiveLoopTask.ContinueWith(task => task.WaitAndUnwrapException());
+                _receiveLoopTask.ContinueWith(task => {
+                    if (task.IsFaulted)
+                    {
+                        Error?.Invoke(task.Exception);
+                    }
+                });
+            }).ConfigureAwait(false);
+        }
 
-            }).ContinueWith(task =>
+        private Task HandleMissingReceivedInvocationDescriptor(JObject invocationDescriptor)
+        {
+            var invocationId = invocationDescriptor.Value<string>("Id");
+
+            var methodName = invocationDescriptor.Value<string>("MethodName");
+            methodName = string.IsNullOrWhiteSpace(methodName) ? "[Invalid Method Name]" : methodName;
+
+            JArray argumentTokenList = invocationDescriptor.Value<JArray>("Arguments");
+            var argumentList = argumentTokenList?.Count > 0 ? String.Join(", ", argumentTokenList) : "[No Parameters]";
+
+            return HandleMissingReceivedInvocationDescriptor(invocationId, methodName, argumentList);
+        }
+
+        private Task HandleMissingReceivedInvocationDescriptor(InvocationDescriptor invocationDescriptor)
+        {
+            var methodName = invocationDescriptor.MethodName;
+            methodName = string.IsNullOrWhiteSpace(methodName) ? "[Invalid Method Name]" : methodName;
+
+            object[] argumentTokenList = invocationDescriptor.Arguments;
+            var argumentList = argumentTokenList?.Length > 0 ? String.Join(", ", argumentTokenList) : "[No Parameters]";
+
+            return HandleMissingReceivedInvocationDescriptor(invocationDescriptor.Id, methodName, argumentList);
+        }
+
+        private Task HandleMissingReceivedInvocationDescriptor(string invocationId, string methodName, string argumentList)
+        {
+            if (_options.ThrowOnMissingMethodRequest)
             {
-                if (task.IsFaulted)
-                {
-                    _taskCompletionSource.SetException(task.Exception.InnerException);
-                }
-                else if (task.IsCanceled)
-                {
-                    _taskCompletionSource.SetCanceled();
-                }
-                else
-                {
-                    _taskCompletionSource.SetResult(null);
-                }
-            });
+                throw new MorseLException($"Invalid method request received; method is \"{methodName}({argumentList})\"");
+            }
 
-            return _taskCompletionSource.Task;
+            _logger?.LogDebug($"Invalid method request received; method is \"{methodName}({argumentList})\"");
+
+            // TODO : Move to a Error type that can be handled specifically
+            // Since we don't have an invocation descriptor we can't return an invocation result
+            return _clientWebSocket.SendAsync($"Error: Cannot find method \"{methodName}({argumentList})\"");
+        }
+
+        private Task HandleInvalidReceivedInvocationDescriptor(string serializedInvocationDescriptor)
+        {
+            // Try to create a typeless descriptor
+            JObject invocationDescriptor = null;
+            try
+            {
+                invocationDescriptor = Json.Deserialize<JObject>(serializedInvocationDescriptor);
+            }
+            catch { }
+
+            // We were able to make heads or tails of the invocation descriptor
+            if (invocationDescriptor != null)
+            {
+                return HandleMissingReceivedInvocationDescriptor(invocationDescriptor);
+            }
+
+            return HandleUnparseableReceivedInvocationDescriptor(serializedInvocationDescriptor);
+        }
+
+        private Task HandleUnparseableReceivedInvocationDescriptor(string serializedInvocationDescriptor, Exception exception = null)
+        {
+            // We have no idea what we have for a message
+            if (_options.ThrowOnInvalidMessage)
+            {
+                throw new MorseLException($"Invalid message received \"{serializedInvocationDescriptor}\"", exception);
+            }
+
+            _logger?.LogError(new EventId(), exception, $"Invalid message \"{serializedInvocationDescriptor}\"");
+
+            // TODO : Move to a Error type that can be handled specifically
+            // Since we don't have an invocation descriptor we can't return an invocation result
+            return _clientWebSocket.SendAsync($"Error: Invalid message \"{serializedInvocationDescriptor}\"");
         }
 
         public void On(string methodName, Type[] types, Action<object[]> handler)
         {
+            if (_options.RethrowUnobservedExceptions && _pendingExceptions?.Count > 0)
+            {
+                throw new AggregateException("Unobserved exceptions thrown during receive loop", _pendingExceptions);
+            }
+
             var invocationHandler = new InvocationHandler(handler, types);
             _handlers.AddOrUpdate(methodName, invocationHandler, (_, __) => invocationHandler);
         }
 
         public Task Invoke(string methodName, params object[] args) => Invoke<object>(methodName, CancellationToken.None, args);
         public Task<T> Invoke<T>(string methodName, params object[] args) => Invoke<T>(methodName, CancellationToken.None, args);
-        public async Task<T> Invoke<T>(string methodName, CancellationToken cancellationToken, params object[] args) => (T)await Invoke(methodName, typeof(T), cancellationToken, args);
+        public async Task<T> Invoke<T>(string methodName, CancellationToken cancellationToken, params object[] args) => (T)await Invoke(methodName, typeof(T), cancellationToken, args).ConfigureAwait(false);
         public Task<object> Invoke(string methodName, Type returnType, params object[] args) => Invoke(methodName, returnType, CancellationToken.None, args);
         public async Task<object> Invoke(string methodName, Type returnType, CancellationToken cancellationToken, params object[] args)
         {
+            if (_options.RethrowUnobservedExceptions && _pendingExceptions?.Count > 0)
+            {
+                throw new AggregateException("Unobserved exceptions thrown during receive loop", _pendingExceptions);
+            }
+
             var descriptor = new InvocationDescriptor
             {
                 Id = GetNextId(),
@@ -158,7 +272,13 @@ namespace MorseL.Client
                 };
                 await transformDelegator
                     .Invoke(message)
-                    .ContinueWith(task => transformIterator.Dispose())
+                    .ContinueWith(task => {
+                        // Dispose first before handling return state
+                        transformIterator.Dispose();
+
+                        // Unwrap and allow the outer exception handler to handle this case
+                        task.WaitAndUnwrapException();
+                    })
                     .ConfigureAwait(false);
             }
             catch (Exception e)
@@ -170,13 +290,51 @@ namespace MorseL.Client
                 }
             }
 
-            return await request.Completion.Task;
+            return await request.Completion.Task.ConfigureAwait(false);
         }
 
-        private void InvokeOn(InvocationDescriptor descriptor)
+        private Task InvokeOn(InvocationDescriptor descriptor)
         {
+            if (!_handlers.ContainsKey(descriptor.MethodName))
+            {
+                return HandleMissingReceivedInvocationDescriptor(descriptor);
+            }
+
             var invocationHandler = _handlers[descriptor.MethodName];
-            Task.Run(() => invocationHandler.Handler(descriptor.Arguments));
+
+            // This task is unawaited to allow in-bound packet payloads to be
+            // handled in parallel. Should these tasks be waited each payload
+            // is handled synchronously. This has the added disadvantage of
+            // deadlocking a caller who does:
+            // 1. Invoke(...) -> Pending Response (Blocks caller context)
+            // 2.   <- On(...) callback fired (Blocks receive context)
+            //      {
+            // 3.     -> Invoke(...) -> Pending Response (Blocks receive context)
+            // 4. Deadlock
+            // In this scenario, the first Invoke(...) awaits on a
+            // TaskCompletionSource who's SetResult is called when an
+            // InvocationResultDescriptor comes in through the socket recieve
+            // loop. When a message for an On callback, not the result descriptor,
+            // comes in, the callback is fired allowing a caller to issue another
+            // Invoke(...) call which again blocks on another
+            // TaskCompletionSource, disallowing the On callback from concluding
+            // which prevents the socket receive loop from moving to the
+            // next message.
+
+            /*! Unawaited Task !*/
+            Task.Run(() => {
+                try
+                {
+                    invocationHandler.Handler(descriptor.Arguments);
+                }
+                catch (Exception e)
+                {
+                    _logger?.LogError(new EventId(), e, $"Exception thrown during registered callback for {descriptor.MethodName}");
+                    Error?.Invoke(new Exception($"Exception thrown during registered callback for {descriptor.MethodName}", e));
+                }
+            });
+
+            return Task.CompletedTask;
         }
 
         private void HandleInvokeResult(InvocationResultDescriptor descriptor)
@@ -192,7 +350,7 @@ namespace MorseL.Client
 
             if (!string.IsNullOrEmpty(descriptor.Error))
             {
-                request.Completion.TrySetException(new Exception(descriptor.Error));
+                request.Completion.TrySetException(new MorseLException(descriptor.Error));
             }
             else
             {
@@ -215,11 +373,11 @@ namespace MorseL.Client
             }
         }
 
-        private async Task Receive(Action<Message> handleMessage)
+        private async Task Receive(Func<Message, Task> handleMessage)
         {
-            try
+            while (_clientWebSocket.State == WebSocketState.Open)
             {
-                while (_clientWebSocket.State == WebSocketState.Open)
+                try
                 {
                     var receivedMessage = await _clientWebSocket.RecieveAsync(CancellationToken.None).ConfigureAwait(false);
 
@@ -244,17 +402,30 @@ namespace MorseL.Client
                     };
 
                     await receiveDelegator(receivedMessage)
-                        .ContinueWith(task => receiveIterator.Dispose())
+                        .ContinueWith(task =>
+                        {
+                            // Dispose of our middleware iterator before we handle possible exceptions
+                            receiveIterator.Dispose();
+
+                            // Unwrap and allow the outer catch to handle if we have an exception
+                            task.WaitAndUnwrapException();
+                        })
                         .ConfigureAwait(false);
                 }
-            }
-            catch (WebSocketClosedException)
-            {
-                // Eat the exception because we're closing
+                catch (WebSocketClosedException)
+                {
+                    // Eat the exception because we're closing
+                    // But we cancel out because the socket is closed
+                    break;
+                }
+                catch (Exception e)
+                {
+                    Error?.Invoke(e);
+                }
             }
         }
 
-        private async Task InternalReceive(WebSocketPacket receivedMessage, Action<Message> handleMessage)
+        private async Task InternalReceive(WebSocketPacket receivedMessage, Func<Message, Task> handleMessage)
         {
             switch (receivedMessage.MessageType)
             {
@@ -265,13 +436,11 @@ namespace MorseL.Client
                 case WebSocketMessageType.Text:
                     var serializedMessage = Encoding.UTF8.GetString(receivedMessage.Data);
                     var message = Json.Deserialize<Message>(serializedMessage);
-                    handleMessage(message);
+                    await handleMessage(message).ConfigureAwait(false);
                     break;
 
                 case WebSocketMessageType.Close:
-                    await _clientWebSocket
-                        .CloseAsync(CancellationToken.None)
-                        .ConfigureAwait(false);
+                    await _clientWebSocket.CloseAsync(CancellationToken.None).ConfigureAwait(false);
                     break;
                 default:
                     throw new ArgumentOutOfRangeException();
