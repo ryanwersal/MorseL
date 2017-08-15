@@ -1,4 +1,5 @@
 using System.Threading.Tasks;
+using Microsoft.Extensions.Logging;
 using MorseL.Shared.Tests;
 using MorseL.Sockets;
 using MorseL.Sockets.Middleware;
@@ -34,7 +35,8 @@ namespace MorseL.Tests
             {
                 var socket = new FakeSocket();
 
-                var connection = _manager.AddConnection(new WebSocketChannel(socket, new IMiddleware[] {}));
+                ILoggerFactory loggerFactory = new LoggerFactory();
+                var connection = _manager.AddConnection(new WebSocketChannel(socket, new IMiddleware[] {}, loggerFactory));
                 var id = _manager.GetId(connection);
 
                 Assert.Same(socket, ((WebSocketChannel)_manager.GetConnectionById(id).Channel).Socket);
@@ -52,7 +54,8 @@ namespace MorseL.Tests
             [Fact]
             public void WhenOneSocket_ShouldReturnOne()
             {
-                _manager.AddConnection(new WebSocketChannel(new FakeSocket(), new IMiddleware[] { }));
+                ILoggerFactory loggerFactory = new LoggerFactory();
+                _manager.AddConnection(new WebSocketChannel(new FakeSocket(), new IMiddleware[] { }, loggerFactory));
 
                 Assert.Equal(1, _manager.GetAll().Count);
             }
@@ -80,7 +83,8 @@ namespace MorseL.Tests
             public void WhenTrackedInstance_ShouldReturnId()
             {
                 var socket = new FakeSocket();
-                var connection = _manager.AddConnection(new WebSocketChannel(new FakeSocket(), new IMiddleware[] { }));
+                ILoggerFactory loggerFactory = new LoggerFactory();
+                var connection = _manager.AddConnection(new WebSocketChannel(socket, new IMiddleware[] { }, loggerFactory));
 
                 var id = _manager.GetId(connection);
 
@@ -101,7 +105,8 @@ namespace MorseL.Tests
             [Fact]
             public void WhenInstance_ShouldContainSocket()
             {
-                _manager.AddConnection(new WebSocketChannel(new FakeSocket(), new IMiddleware[] { }));
+                ILoggerFactory loggerFactory = new LoggerFactory();
+                _manager.AddConnection(new WebSocketChannel(new FakeSocket(), new IMiddleware[] { }, loggerFactory));
 
                 Assert.Equal(1, _manager.GetAll().Count);
             }

@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Text;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Logging;
 using MorseL.Common;
 using MorseL.Common.Serialization;
 using MorseL.Shared.Tests;
@@ -19,7 +20,8 @@ namespace MorseL.Sockets.Test
         public async Task SendAsyncMiddlewareIsCalledOnArbitrarySendMessageAsync(string text)
         {
             var socket = new LinkedFakeSocket();
-            var webSocketChannel = new WebSocketChannel(socket, new []{ new Base64Middleware() });
+            ILoggerFactory loggerFactory = new LoggerFactory();
+            var webSocketChannel = new WebSocketChannel(socket, new []{ new Base64Middleware() }, loggerFactory);
             await webSocketChannel.SendMessageAsync(new Message
             {
                 Data = text,
@@ -37,7 +39,8 @@ namespace MorseL.Sockets.Test
         public async Task SendAsyncMiddlewareIsCalledOnArbitrarySendAsync(string text)
         {
             var socket = new LinkedFakeSocket();
-            var webSocketChannel = new WebSocketChannel(socket, new[] { new Base64Middleware() });
+            ILoggerFactory loggerFactory = new LoggerFactory();
+            var webSocketChannel = new WebSocketChannel(socket, new[] { new Base64Middleware() }, loggerFactory);
             await webSocketChannel.SendAsync(new MemoryStream(Encoding.UTF8.GetBytes(text)));
 
             var encodedMessage = await socket.ReadToEndAsync();
@@ -57,7 +60,8 @@ namespace MorseL.Sockets.Test
             }
 
             var socket = new LinkedFakeSocket();
-            var webSocketChannel = new WebSocketChannel(socket, middlewares);
+            ILoggerFactory loggerFactory = new LoggerFactory();
+            var webSocketChannel = new WebSocketChannel(socket, middlewares, loggerFactory);
             await webSocketChannel.SendMessageAsync(new Message
             {
                 Data = text,
@@ -82,7 +86,8 @@ namespace MorseL.Sockets.Test
             }
 
             var socket = new LinkedFakeSocket();
-            var webSocketChannel = new WebSocketChannel(socket, middlewares);
+            ILoggerFactory loggerFactory = new LoggerFactory();
+            var webSocketChannel = new WebSocketChannel(socket, middlewares, loggerFactory);
             await webSocketChannel.SendAsync(new MemoryStream(Encoding.UTF8.GetBytes(text)));
 
             foreach (var m in middlewares)
