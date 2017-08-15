@@ -15,6 +15,7 @@ namespace MorseL.Sockets
     {
         ChannelState State { get; }
         Task SendAsync(Stream stream);
+        Task DisposeAsync();
     }
 
     public enum ChannelState

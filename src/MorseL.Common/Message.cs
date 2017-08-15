@@ -7,7 +7,7 @@ namespace MorseL.Common
         Text = 0,
         ClientMethodInvocation = 1,
         ConnectionEvent = 2,
-        InvocationResult
+        InvocationResult = 3
     }
 
     public class Message

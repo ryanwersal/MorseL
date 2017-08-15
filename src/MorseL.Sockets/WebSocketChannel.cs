@@ -4,6 +4,7 @@ using System.IO;
 using System.Net.WebSockets;
 using System.Threading;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Logging;
 using MorseL.Sockets.Middleware;
 
 namespace MorseL.Sockets
@@ -13,12 +14,14 @@ namespace MorseL.Sockets
         internal readonly WebSocket Socket;
         internal Connection Connection;
         internal IEnumerable<IMiddleware> Middleware;
-        private SemaphoreSlim _writeLock = new SemaphoreSlim(1);
+        internal ILogger Logger;
+        private readonly SemaphoreSlim _writeLock = new SemaphoreSlim(1);
 
-        public WebSocketChannel(WebSocket socket, IEnumerable<IMiddleware> middleware)
+        public WebSocketChannel(WebSocket socket, IEnumerable<IMiddleware> middleware, ILoggerFactory loggerFactory)
         {
             Socket = socket;
             Middleware = middleware ?? new List<IMiddleware>();
+            Logger = loggerFactory.CreateLogger<WebSocketChannel>();
         }
 
         public ChannelState State => Socket?.State != null ? (ChannelState) Socket.State : ChannelState.None;
@@ -70,6 +73,22 @@ namespace MorseL.Sockets
             {
                 _writeLock.Release();
             }
+        }
+
+        public async Task DisposeAsync()
+        {
+            if (Socket == null) return;
+
+            try
+            {
+                await Socket.CloseAsync(WebSocketCloseStatus.NormalClosure, null, CancellationToken.None);
+            }
+            catch (WebSocketException e)
+            {
+                Logger.LogDebug(null, e, "Attempted to close an already closed socket.");
+            }
+
+            Socket.Dispose();
         }
     }
 }

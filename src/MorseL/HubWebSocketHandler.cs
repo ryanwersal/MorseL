@@ -13,6 +13,9 @@ using MorseL.Diagnostics;
 using MorseL.Internal;
 using MorseL.Scaleout;
 using MorseL.Sockets;
+using MorseL.Extensions;
+using Microsoft.Extensions.Options;
+using Newtonsoft.Json.Linq;
 
 namespace MorseL
 {
@@ -33,6 +36,7 @@ namespace MorseL
         private readonly ILogger<HubWebSocketHandler<THub, TClient>> _logger;
         private readonly IAuthorizeData[] _authorizeData;
         private readonly IScaleoutBackPlane _scaleoutBackPlane;
+        private readonly MorseLOptions _morselOptions;
 
         public HubWebSocketHandler(IServiceProvider services, ILoggerFactory loggerFactory) : base(services, loggerFactory)
         {
@@ -40,6 +44,7 @@ namespace MorseL
             _logger = loggerFactory.CreateLogger<HubWebSocketHandler<THub, TClient>>();
             _serviceScopeFactory = services.GetRequiredService<IServiceScopeFactory>();
             _scaleoutBackPlane = services.GetService<IScaleoutBackPlane>();
+            _morselOptions = services.GetService<IOptions<MorseLOptions>>().Value;
 
             _authorizeData = typeof(THub).GetTypeInfo().GetCustomAttributes().OfType<IAuthorizeData>().ToArray();
             DiscoverHubMethods();
@@ -152,27 +157,30 @@ namespace MorseL
 
         public override async Task ReceiveAsync(Connection connection, string serializedInvocationDescriptor)
         {
-            var invocationDescriptor = Json.DeserializeInvocationDescriptor(serializedInvocationDescriptor, _methods.Values.Select(d => d.MethodExecutor.MethodInfo).ToArray());
+            InvocationDescriptor invocationDescriptor = null;
+            try
+            {
+                invocationDescriptor = Json.DeserializeInvocationDescriptor(serializedInvocationDescriptor, _methods.Values.Select(d => d.MethodExecutor.MethodInfo).ToArray());
+            }
+            catch (Exception e)
+            {
+                await HandleUnparseableReceivedInvocationDescriptor(connection, serializedInvocationDescriptor, e);
+                return;
+            }
 
             if (invocationDescriptor == null)
             {
-                await connection.Channel.SendMessageAsync(new Message()
-                {
-                    MessageType = MessageType.Text,
-                    Data = $"Cannot find method to match inbound request for {connection.Id}"
-                }).ConfigureAwait(false);
+                // Valid JSON but unparseable into a known, typed invocation descriptor (unknown method name, invalid parameters)
+                await HandleInvalidReceivedInvocationDescriptor(connection, serializedInvocationDescriptor);
                 return;
             }
 
             HubMethodDescriptor descriptor;
             if (!_methods.TryGetValue(invocationDescriptor.MethodName, out descriptor))
             {
-                await connection.Channel.SendMessageAsync(new Message()
-                {
-                    MessageType = MessageType.Text,
-                    Data = $"Cannot find method {invocationDescriptor.MethodName} to match inbound request for {connection.Id}"
-                }).ConfigureAwait(false);
-                return;
+                // Really strange and unlikely, valid JSON and was known but not found here
+                // Likely not possible
+                await HandleMissingReceivedInvocationDescriptor(connection, invocationDescriptor);
             }
 
             var result = await Invoke(descriptor, connection, invocationDescriptor);
@@ -184,6 +192,118 @@ namespace MorseL
             };
 
             await connection.Channel.SendMessageAsync(message);
+        }
+
+        private Task HandleMissingReceivedInvocationDescriptor(Connection connection, JObject invocationDescriptor)
+        {
+            var invocationId = invocationDescriptor.Value<string>("Id");
+
+            var methodName = invocationDescriptor.Value<string>("MethodName");
+            methodName = string.IsNullOrWhiteSpace(methodName) ? "[Invalid Method Name]" : methodName;
+
+            JArray argumentTokenList = invocationDescriptor.Value<JArray>("Arguments");
+            var argumentList = argumentTokenList?.Count > 0 ? String.Join(", ", argumentTokenList) : "[No Parameters]";
+
+            return HandleMissingReceivedInvocationDescriptor(connection, invocationId, methodName, argumentList);
+        }
+
+        private Task HandleMissingReceivedInvocationDescriptor(Connection connection, InvocationDescriptor invocationDescriptor)
+        {
+            var methodName = invocationDescriptor.MethodName;
+            methodName = string.IsNullOrWhiteSpace(methodName) ? "[Invalid Method Name]" : methodName;
+
+            object[] argumentTokenList = invocationDescriptor.Arguments;
+            var argumentList = argumentTokenList?.Length > 0 ? String.Join(", ", argumentTokenList) : "[No Parameters]";
+
+            return HandleMissingReceivedInvocationDescriptor(connection, invocationDescriptor.Id, methodName, argumentList);
+        }
+
+        private Task HandleMissingReceivedInvocationDescriptor(Connection connection, string invocationId, string methodName, string argumentList)
+        {
+            if (_morselOptions.ThrowOnMissingHubMethodRequest)
+            {
+                throw new MorseLException($"Invalid method request received from {connection.Id}; method is \"{methodName}({argumentList})\"");
+            }
+
+            _logger?.LogDebug($"Invalid method request received from {connection.Id}; method is \"{methodName}({argumentList})\"");
+
+            return connection.Channel.SendMessageAsync(new Message()
+            {
+                MessageType = MessageType.InvocationResult,
+                Data = Json.SerializeObject(new InvocationResultDescriptor
+                {
+                    Id = invocationId,
+                    Error = $"Cannot find method \"{methodName}({argumentList})\""
+                })
+            });
+        }
+
+        private Task HandleInvalidReceivedInvocationDescriptor(Connection connection, string serializedInvocationDescriptor)
+        {
+            // Try to create a typeless descriptor
+            JObject invocationDescriptor = null;
+            try
+            {
+                invocationDescriptor = Json.Deserialize<JObject>(serializedInvocationDescriptor);
+            }
+            catch { }
+
+            // We were able to make heads or tails of the invocation descriptor
+            if (invocationDescriptor != null && invocationDescriptor.Value<string>("Id") != null)
+            {
+                return HandleMissingReceivedInvocationDescriptor(connection, invocationDescriptor);
+            }
+
+            return HandleUnparseableReceivedInvocationDescriptor(connection, serializedInvocationDescriptor);
+        }
+
+        private Task HandleUnparseableReceivedInvocationDescriptor(Connection connection, string serializedInvocationDescriptor, Exception exception = null)
+        {
+            // Hack so we don't have refactor the client to send the full Message wrapped payload
+            // Right now it only sends serialized InvocationDescriptors, whereas Hubs send a Message
+            // wrapped payload that can contain other types of messages within Data.
+            // However, we want to be able to handle specific error cases clients inform us about
+            // (ie. hubs sending invalid invocation requests) so we specifically check here for now
+            // In any event, if we are here, we are definitely in an error case so the small chance
+            // that we have a false positive on a match here will still be an error case.
+            if (serializedInvocationDescriptor.StartsWith("Error: Cannot find method"))
+            {
+                if (_morselOptions.ThrowOnMissingClientMethodInvoked)
+                {
+                    throw new MorseLException($"{serializedInvocationDescriptor} from {connection.Id}");
+                }
+
+                _logger?.LogError($"{serializedInvocationDescriptor} from {connection.Id}");
+
+                return Task.CompletedTask;
+            } else if (serializedInvocationDescriptor.StartsWith("Error: Invalid message"))
+            {
+                // We have no idea what we have for a message
+                if (_morselOptions.ThrowOnInvalidMessage)
+                {
+                    throw new MorseLException($"Invalid message sent \"{serializedInvocationDescriptor}\" and unhandled by {connection.Id}");
+                }
+
+                _logger?.LogError($"Invalid message sent \"{serializedInvocationDescriptor}\" and unhandled by {connection.Id}");
+
+                return Task.CompletedTask;
+            }
+
+            // We have no idea what we have for a message
+            if (_morselOptions.ThrowOnInvalidMessage)
+            {
+                throw new MorseLException($"Invalid message received \"{serializedInvocationDescriptor}\" from {connection.Id}");
+            }
+
+            _logger?.LogError(new EventId(), exception, $"Invalid message \"{serializedInvocationDescriptor}\" received from {connection.Id}");
+
+            // TODO : Move to a Error type that can be handled specifically
+            // Since we don't have an invocation descriptor we can't return an invocation result
+            return connection.Channel.SendMessageAsync(new Message()
+            {
+                MessageType = MessageType.Text,
+                Data = $"Invalid message \"{serializedInvocationDescriptor}\""
+            });
         }
 
         private async Task<InvocationResultDescriptor> Invoke(HubMethodDescriptor descriptor, Connection connection, InvocationDescriptor invocationDescriptor)

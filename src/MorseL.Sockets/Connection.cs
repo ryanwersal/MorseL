@@ -30,11 +30,7 @@ namespace MorseL.Sockets
 
         public async Task DisposeAsync()
         {
-            await ((WebSocketChannel)Channel).Socket.CloseAsync(WebSocketCloseStatus.NormalClosure,
-                    "Closed by manager.",
-                    CancellationToken.None)
-                .ConfigureAwait(false);
-            ((WebSocketChannel) Channel).Socket.Dispose();
+            await Channel.DisposeAsync();
         }
     }
 }
