@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Net;
 using System.Text;
 using System.Threading;
@@ -13,16 +14,17 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using MorseL;
 using MorseL.Extensions;
+using MorseL.Sockets.Middleware;
 
 namespace MorseL.Client.WebSockets.Tests
 {
     public class SimpleMorseLServer<THub> where THub : Hub
     {
         private readonly IWebHost _webHost;
-        private static Action<IServiceCollection> ServiceConfigurator;
+        private static Action<IServiceCollection, IMorseLBuilder> ServiceConfigurator;
         private static Action<IApplicationBuilder, IServiceProvider> ApplicationCongurator;
 
-        public SimpleMorseLServer(IPAddress address, int port, Action<IServiceCollection> services = null, Action<IApplicationBuilder, IServiceProvider> configure = null)
+        public SimpleMorseLServer(IPAddress address, int port, Action<IServiceCollection, IMorseLBuilder> services = null, Action<IApplicationBuilder, IServiceProvider> configure = null, IMiddleware[] middleware = null)
         {
             ServiceConfigurator = services;
             ApplicationCongurator = configure;
@@ -50,8 +52,8 @@ namespace MorseL.Client.WebSockets.Tests
 
             public void ConfigureServices(IServiceCollection services)
             {
-                services.AddMorseL();
-                ServiceConfigurator?.Invoke(services);
+                var builder = services.AddMorseL();
+                ServiceConfigurator?.Invoke(services, builder);
             }
 
             public void Configure(IApplicationBuilder app, IServiceProvider serviceProvider, ILoggerFactory loggerFactory)

@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Net.WebSockets;
+using System.Runtime.CompilerServices;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
@@ -13,54 +14,27 @@ using MorseL.Common.Serialization;
 using MorseL.Extensions;
 using MorseL.Shared.Tests;
 using MorseL.Sockets;
+using StackExchange.Redis;
 using Xunit;
 
-namespace MorseL.Scaleout.Tests
+namespace MorseL.Scaleout.Redis.Tests
 {
-    public class ScaleoutTests
+    public class RedisBackplaneTests
     {
         private int _nextId;
 
         [Fact]
-        public async void ClientConnectCallsBackplaneOnClientConnected()
-        {
-            var backplane = new TestBackplane();
-            var serviceProvider = CreateServiceProvider(o => {
-                o.AddSingleton<IBackplane>(backplane);
-            });
-            var actualHub = serviceProvider.GetRequiredService<HubWebSocketHandler<TestHub>>();
-            var webSocket = new LinkedFakeSocket();
-
-            var exception = await Assert.ThrowsAnyAsync<NotImplementedException>(
-                () => CreateHubConnectionFromSocket(actualHub, webSocket));
-            Assert.Equal(nameof(TestBackplane.OnClientConnectedAsync), exception.Message);
-        }
-
-        [Fact]
-        public async void ClientDisconnectCallsBackplaneOnClientDisconnected()
-        {
-            var backplane = new TestBackplane() {
-                OnClientConnectedCallback = (id) => Task.CompletedTask
-            };
-            var serviceProvider = CreateServiceProvider(o => {
-                o.AddSingleton<IBackplane>(backplane);
-            });
-            var actualHub = serviceProvider.GetRequiredService<HubWebSocketHandler<TestHub>>();
-            var webSocket = new LinkedFakeSocket();
-
-            var connection = await CreateHubConnectionFromSocket(actualHub, webSocket);
-            var exception = await Assert.ThrowsAnyAsync<NotImplementedException>(
-                () => actualHub.OnDisconnected(webSocket, null));
-            Assert.Equal(nameof(TestBackplane.OnClientDisconnectedAsync), exception.Message);
-        }
-
-        [Fact]
         public async void SubscriptionAddedOnSubscribe()
         {
-            var backplane = new DefaultBackplane();
             var serviceProvider = CreateServiceProvider(o => {
-                o.AddSingleton<IBackplane>(backplane);
+                o.AddSingleton<IBackplane, RedisBackplane>();
+                o.Configure<ConfigurationOptions>(options =>
+                {
+                    options.EndPoints.Add("localhost:6379");
+                });
             });
+
+            var backplane = (RedisBackplane) serviceProvider.GetRequiredService<IBackplane>();
             var actualHub = serviceProvider.GetRequiredService<HubWebSocketHandler<TestHub>>();
             var webSocket = new LinkedFakeSocket();
 
@@ -74,10 +48,15 @@ namespace MorseL.Scaleout.Tests
         [Fact]
         public async void SubscriptionRemovedOnDisconnect()
         {
-            var backplane = new DefaultBackplane();
             var serviceProvider = CreateServiceProvider(o => {
-                o.AddSingleton<IBackplane>(backplane);
+                o.AddSingleton<IBackplane, RedisBackplane>();
+                o.Configure<ConfigurationOptions>(options =>
+                {
+                    options.EndPoints.Add("localhost:6379");
+                });
             });
+
+            var backplane = (RedisBackplane)serviceProvider.GetRequiredService<IBackplane>();
             var actualHub = serviceProvider.GetRequiredService<HubWebSocketHandler<TestHub>>();
             var webSocket = new LinkedFakeSocket();
 
@@ -94,22 +73,51 @@ namespace MorseL.Scaleout.Tests
         [Fact]
         public async void SubscriptionRemovedOnUnsubscribe()
         {
-            var backplane = new DefaultBackplane();
             var serviceProvider = CreateServiceProvider(o => {
-                o.AddSingleton<IBackplane>(backplane);
+                o.AddSingleton<IBackplane, RedisBackplane>();
+                o.Configure<ConfigurationOptions>(options =>
+                {
+                    options.EndPoints.Add("localhost:6379");
+                });
             });
+
+            var backplane = (RedisBackplane)serviceProvider.GetRequiredService<IBackplane>();
             var actualHub = serviceProvider.GetRequiredService<HubWebSocketHandler<TestHub>>();
             var webSocket = new LinkedFakeSocket();
 
             var connection = await CreateHubConnectionFromSocket(actualHub, webSocket);
 
+            // Subscribe to n groups
             await backplane.Subscribe("some-group", connection.Id);
+            await backplane.Subscribe("some-other-group", connection.Id);
 
+            // Make sure our group list contains them
             Assert.Contains("some-group", backplane.Groups.Keys);
+            Assert.Contains("some-other-group", backplane.Groups.Keys);
 
+            // Make sure out subscription list contains them
+            Assert.Contains(connection.Id, backplane.Subscriptions.Keys);
+            Assert.Contains("some-group", backplane.Subscriptions[connection.Id].Keys);
+            Assert.Contains("some-other-group", backplane.Subscriptions[connection.Id].Keys);
+
+            // Unsubscribe from one group
             await backplane.Unsubscribe("some-group", connection.Id);
 
+            // Validate that group has been removed
             Assert.DoesNotContain("some-group", backplane.Groups.Keys);
+            Assert.DoesNotContain("some-group", backplane.Subscriptions[connection.Id].Keys);
+
+            // Make sure the other group is still subscribed
+            Assert.Contains("some-other-group", backplane.Groups.Keys);
+            Assert.Contains(connection.Id, backplane.Subscriptions.Keys);
+            Assert.Contains("some-other-group", backplane.Subscriptions[connection.Id].Keys);
+
+            // Unsubscribe from the final group
+            await backplane.Unsubscribe("some-other-group", connection.Id);
+
+            // Validate that both groups have been unsubscribed and individual collections are gone
+            Assert.DoesNotContain("some-group", backplane.Groups.Keys);
+            Assert.DoesNotContain("some-other-group", backplane.Groups.Keys);
             Assert.DoesNotContain(connection.Id, backplane.Subscriptions.Keys);
         }
 
@@ -117,10 +125,15 @@ namespace MorseL.Scaleout.Tests
         [InlineData("Some message")]
         public async void MessageSentToSubscribedGroup(string messageText)
         {
-            var backplane = new DefaultBackplane();
             var serviceProvider = CreateServiceProvider(o => {
-                o.AddSingleton<IBackplane>(backplane);
+                o.AddSingleton<IBackplane, RedisBackplane>();
+                o.Configure<ConfigurationOptions>(options =>
+                {
+                    options.EndPoints.Add("localhost:6379");
+                });
             });
+
+            var backplane = (RedisBackplane)serviceProvider.GetRequiredService<IBackplane>();
             var actualHub = serviceProvider.GetRequiredService<HubWebSocketHandler<TestHub>>();
             var webSocket = new LinkedFakeSocket();
 
@@ -132,6 +145,8 @@ namespace MorseL.Scaleout.Tests
                 MessageType = MessageType.Text,
                 Data = messageText
             });
+
+            await Task.Delay(1000);
 
             var message = await ReadMessageFromSocketAsync(webSocket);
 

@@ -6,7 +6,7 @@ using StackExchange.Redis;
 
 namespace MorseL.Scaleout.Redis
 {
-    public static class IMorseLBuilderExtensions
+    public static class MorseLBuilderExtensions
     {
         public static IMorseLBuilder AddRedisBackplane(this IMorseLBuilder builder, Action<ConfigurationOptions> options) {
             builder.Services.Configure<ConfigurationOptions>(options);

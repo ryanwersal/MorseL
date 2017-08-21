@@ -14,12 +14,12 @@ namespace MorseL
     {
         private readonly ILogger _logger;
         private WebSocketConnectionManager Manager { get; }
-        private IBackplane _backplane { get; }
+        private IBackplane Backplane { get; }
 
         public ClientsDispatcher(WebSocketConnectionManager manager, IBackplane backplane, ILogger<ClientsDispatcher> logger)
         {
             Manager = manager;
-            _backplane = backplane;
+            Backplane = backplane;
             _logger = logger;
 
             All = new ClientInvoker(
@@ -34,17 +34,17 @@ namespace MorseL
                             Arguments = args
                         })
                     };
-                    await _backplane.SendMessageAllAsync(message).ConfigureAwait(false);
+                    await Backplane.SendMessageAllAsync(message).ConfigureAwait(false);
                 },
                 async msg =>
                 {
-                    await _backplane.SendMessageAllAsync(msg).ConfigureAwait(false);
+                    await Backplane.SendMessageAllAsync(msg).ConfigureAwait(false);
                 },
                 async group => {
-                    await  _backplane.SubscribeAll(group).ConfigureAwait(false);
+                    await  Backplane.SubscribeAll(group).ConfigureAwait(false);
                 },
                 async group => {
-                    await _backplane.UnsubscribeAll(group).ConfigureAwait(false);
+                    await Backplane.UnsubscribeAll(group).ConfigureAwait(false);
                 });
         }
 
@@ -68,21 +68,21 @@ namespace MorseL
                                 Arguments = args
                             })
                         };
-                        await _backplane.SendMessageAsync(connectionId, message).ConfigureAwait(false);
+                        await Backplane.SendMessageAsync(connectionId, message).ConfigureAwait(false);
                     }
                 },
                 async msg => {
                     if (connection != null) {
                         await connection.Channel.SendMessageAsync(msg).ConfigureAwait(false);
                     } else {
-                        await _backplane.SendMessageAsync(connectionId, msg).ConfigureAwait(false);
+                        await Backplane.SendMessageAsync(connectionId, msg).ConfigureAwait(false);
                     }
                 },
                 async group => {
-                    await  _backplane.Subscribe(group, connectionId).ConfigureAwait(false);
+                    await  Backplane.Subscribe(group, connectionId).ConfigureAwait(false);
                 },
                 async group => {
-                    await _backplane.Unsubscribe(group, connectionId).ConfigureAwait(false);
+                    await Backplane.Unsubscribe(group, connectionId).ConfigureAwait(false);
                 });
         }
     }

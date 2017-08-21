@@ -1,15 +1,19 @@
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Linq;
+using System.Runtime.CompilerServices;
 using System.Threading.Tasks;
 using MorseL.Common;
 
+[assembly: InternalsVisibleTo("MorseL.Scaleout.Tests")]
 namespace MorseL.Scaleout
 {
     public class DefaultBackplane : IBackplane
     {
-        private readonly IDictionary<string, string> _connections = new ConcurrentDictionary<string, string>();
-        private readonly IDictionary<string, IDictionary<string, string>> _groups = new ConcurrentDictionary<string, IDictionary<string, string>>();
+        private readonly IDictionary<string, object> _connections = new ConcurrentDictionary<string, object>();
+        private readonly IDictionary<string, IDictionary<string, object>> _groups = new ConcurrentDictionary<string, IDictionary<string, object>>();
+        private readonly IDictionary<string, IDictionary<string, object>> _subscriptions = new ConcurrentDictionary<string, IDictionary<string, object>>();
         public event OnMessageDelegate OnMessage;
 
         public Task OnClientConnectedAsync(string connectionId)
@@ -18,10 +22,18 @@ namespace MorseL.Scaleout
             return Task.CompletedTask;
         }
 
-        public Task OnClientDisconnectedAsync(string connectionId)
+        public async Task OnClientDisconnectedAsync(string connectionId)
         {
             _connections.Remove(connectionId);
-            return Task.CompletedTask;
+
+            // Unsubscribe from groups
+            if (_subscriptions.ContainsKey(connectionId))
+            {
+                foreach (var group in _subscriptions[connectionId].Keys.ToArray())
+                {
+                    await Unsubscribe(group, connectionId);
+                }
+            }
         }
 
         public async Task SendMessageAllAsync(Message message)
@@ -38,7 +50,7 @@ namespace MorseL.Scaleout
 
         public async Task SendMessageGroupAsync(string group, Message message)
         {
-            if (!_groups.ContainsKey(group)) {
+            if (_groups.ContainsKey(group)) {
                 foreach (var connection in _groups[group]) {
                     await InvokeOnMessage(connection.Key, message);
                 }
@@ -47,22 +59,44 @@ namespace MorseL.Scaleout
 
         public Task Subscribe(string group, string connectionId)
         {
-            if (_groups.ContainsKey(group)) {
-                var subscribers = _groups[group] = new ConcurrentDictionary<string, string>();
+            if (group == null) throw new ArgumentNullException(nameof(group));
+            if (connectionId == null) throw new ArgumentNullException(nameof(connectionId));
+
+            if (!_groups.ContainsKey(group)) {
+                _groups[group] = new ConcurrentDictionary<string, object>();
+            }
+
+            if (!_subscriptions.ContainsKey(connectionId))
+            {
+                _subscriptions[connectionId] = new ConcurrentDictionary<string, object>();
             }
 
             _groups[group].Add(connectionId, null);
+            _subscriptions[connectionId].Add(group, null);
 
             return Task.CompletedTask;
         }
 
         public Task Unsubscribe(string group, string connectionId)
         {
+            if (group == null) throw new ArgumentNullException(nameof(group));
+            if (connectionId == null) throw new ArgumentNullException(nameof(connectionId));
+
             if (_groups.ContainsKey(group)) {
                 _groups[group].Remove(connectionId);
 
                 if (_groups[group].Count == 0) {
                     _groups.Remove(group);
+                }
+            }
+
+            if (_subscriptions.ContainsKey(connectionId))
+            {
+                _subscriptions[connectionId].Remove(group);
+
+                if (_subscriptions[connectionId].Count == 0)
+                {
+                    _subscriptions.Remove(connectionId);
                 }
             }
 
@@ -89,5 +123,8 @@ namespace MorseL.Scaleout
                     .ConfigureAwait(false);
             }
         }
+
+        internal IDictionary<string, IDictionary<string, object>> Groups => _groups;
+        internal IDictionary<string, IDictionary<string, object>> Subscriptions => _subscriptions;
     }
 }
