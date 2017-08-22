@@ -174,7 +174,7 @@ namespace MorseL.Client
 
             // TODO : Move to a Error type that can be handled specifically
             // Since we don't have an invocation descriptor we can't return an invocation result
-            return _clientWebSocket.SendAsync($"Error: Cannot find method \"{methodName}({argumentList})\"");
+            return SendMessageAsync($"Error: Cannot find method \"{methodName}({argumentList})\"");
         }
 
         private Task HandleInvalidReceivedInvocationDescriptor(string serializedInvocationDescriptor)
@@ -208,7 +208,7 @@ namespace MorseL.Client
 
             // TODO : Move to a Error type that can be handled specifically
             // Since we don't have an invocation descriptor we can't return an invocation result
-            return _clientWebSocket.SendAsync($"Error: Invalid message \"{serializedInvocationDescriptor}\"");
+            return SendMessageAsync($"Error: Invalid message \"{serializedInvocationDescriptor}\"");
         }
 
         public void On(string methodName, Type[] types, Action<object[]> handler)
@@ -250,36 +250,7 @@ namespace MorseL.Client
             try
             {
                 var message = Json.SerializeObject(descriptor);
-
-                var transformIterator = _middleware.GetEnumerator();
-                TransmitDelegate transformDelegator = null;
-                transformDelegator = async data =>
-                {
-                    if (transformIterator.MoveNext())
-                    {
-                        using (_logger?.Tracer($"Middleware[{transformIterator.Current.GetType()}].SendAsync(...)"))
-                        {
-                            await transformIterator.Current.SendAsync(data, transformDelegator).ConfigureAwait(false);
-                        }
-                    }
-                    else
-                    {
-                        using (_logger?.Tracer("Connection.SendAsync(...)"))
-                        {
-                            await _clientWebSocket.SendAsync(data, CancellationToken.None).ConfigureAwait(false);
-                        }
-                    }
-                };
-                await transformDelegator
-                    .Invoke(message)
-                    .ContinueWith(task => {
-                        // Dispose first before handling return state
-                        transformIterator.Dispose();
-
-                        // Unwrap and allow the outer exception handler to handle this case
-                        task.WaitAndUnwrapException();
-                    })
-                    .ConfigureAwait(false);
+                await SendMessageAsync(message);
             }
             catch (Exception e)
             {
@@ -291,6 +262,40 @@ namespace MorseL.Client
             }
 
             return await request.Completion.Task.ConfigureAwait(false);
+        }
+
+        private async Task SendMessageAsync(string message)
+        {
+            var transformIterator = _middleware.GetEnumerator();
+            TransmitDelegate transformDelegator = null;
+            transformDelegator = async data =>
+            {
+                if (transformIterator.MoveNext())
+                {
+                    using (_logger?.Tracer($"Middleware[{transformIterator.Current.GetType()}].SendAsync(...)"))
+                    {
+                        await transformIterator.Current.SendAsync(data, transformDelegator).ConfigureAwait(false);
+                    }
+                }
+                else
+                {
+                    using (_logger?.Tracer("Connection.SendAsync(...)"))
+                    {
+                        await _clientWebSocket.SendAsync(data, CancellationToken.None).ConfigureAwait(false);
+                    }
+                }
+            };
+            await transformDelegator
+                .Invoke(message)
+                .ContinueWith(task =>
+                {
+                    // Dispose first before handling return state
+                    transformIterator.Dispose();
+
+                    // Unwrap and allow the outer exception handler to handle this case
+                    task.WaitAndUnwrapException();
+                })
+                .ConfigureAwait(false);
         }
 
         private Task InvokeOn(InvocationDescriptor descriptor)

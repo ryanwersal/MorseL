@@ -22,14 +22,7 @@ namespace MorseL.Client.WebSockets.Tests
 
                 var client = new WebSocketClient("ws://localhost:5000");
 
-                try
-                {
-                    await client.ConnectAsync();
-                }
-                catch (Exception e)
-                {
-                    Assert.True(e.Message.StartsWith("No connection could be made because"));
-                }
+                await Assert.ThrowsAnyAsync<Exception>(() => client.ConnectAsync());
             }
         }
 

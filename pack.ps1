@@ -13,6 +13,7 @@ $projects = @(
     "MorseL.Client",
     "MorseL.Sockets",
     "MorseL.Scaleout",
+    "MorseL.Scaleout.Redis",
     "MorseL.Client.WebSockets"
 )
 

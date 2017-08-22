@@ -1,0 +1,24 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <Import Project="../../version.props" />
+  
+  <PropertyGroup>
+    <TargetFramework>netstandard1.6</TargetFramework>
+    <GeneratePackageOnBuild>True</GeneratePackageOnBuild>
+    <VersionPrefix>$(VersionPrefix)</VersionPrefix>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|AnyCPU'">
+    <DebugType>full</DebugType>
+    <DebugSymbols>True</DebugSymbols>
+  </PropertyGroup>
+  
+  <ItemGroup>
+    <ProjectReference Include="..\MorseL.Scaleout\MorseL.Scaleout.csproj" />
+    <ProjectReference Include="..\MorseL.Common\MorseL.Common.csproj" />
+    <ProjectReference Include="..\MorseL\MorseL.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="StackExchange.Redis" Version="1.2.6" />
+    <PackageReference Include="Newtonsoft.Json" Version="10.0.2" />
+  </ItemGroup>
+</Project>

@@ -1,0 +1,23 @@
+version: '3.1'
+
+services:
+  backplaned-host-1:
+    image: backplaned-host:debug
+    build:
+      context: ./BackplanedHost/bin/PublishOutput/
+      dockerfile: Dockerfile.Debug
+    volumes: 
+      - ./BackplanedHost/bin/PublishOutput/:/app
+      - ~/.nuget/packages:/root/.nuget/packages:ro
+    depends_on: 
+      - redis
+  backplaned-host-2:
+    image: backplaned-host:debug
+    build:
+      context: ./BackplanedHost/bin/PublishOutput/
+      dockerfile: Dockerfile.Debug
+    volumes: 
+      - ./BackplanedHost/bin/PublishOutput/:/app
+      - ~/.nuget/packages:/root/.nuget/packages:ro
+    depends_on: 
+      - redis
