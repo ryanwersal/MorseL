@@ -27,7 +27,7 @@ namespace MorseL.Scaleout.Redis
     public class RedisBackplane : IBackplane
     {
         private const string RedisKeyAllGroup = "redis-backplane:group:all";
-        private const string RedisKeyConnectionPrefix = "redis-backplane:";
+        private const string RedisKeyConnectionPrefix = "redis-backplane:con:";
         private const string RedisKeyGroupPrefix = "redis-backplane:group:";
 
         private readonly Lazy<ConnectionMultiplexer> _lazyConnection;
