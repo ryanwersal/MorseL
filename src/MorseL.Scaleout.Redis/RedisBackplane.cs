@@ -231,6 +231,7 @@ namespace MorseL.Scaleout.Redis
             return RedisKeyGroupPrefix + group;
         }
 
+        internal IDictionary<string, Object> Connections => _connections;
         internal IDictionary<string, IDictionary<string, object>> Groups => _groups;
         internal IDictionary<string, IDictionary<string, object>> Subscriptions => _subscriptions;
     }

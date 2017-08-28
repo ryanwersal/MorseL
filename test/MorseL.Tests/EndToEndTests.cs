@@ -1,6 +1,5 @@
 ﻿using System.Net;
 using System.Threading.Tasks;
-using MorseL.Client.WebSockets.Tests;
 using MorseL.Client;
 using Xunit;
 using MorseL.Common;
@@ -12,6 +11,7 @@ using Microsoft.AspNetCore.Builder;
 using MorseL.Client.Middleware;
 using MorseL.Client.WebSockets;
 using MorseL.Extensions;
+using MorseL.Shared.Tests;
 using MorseL.Sockets.Middleware;
 
 namespace MorseL.Tests
