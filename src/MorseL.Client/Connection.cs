@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Runtime.CompilerServices;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
@@ -16,6 +17,7 @@ using WebSocketMessageType = MorseL.Client.WebSockets.WebSocketMessageType;
 using WebSocketState = WebSocket4Net.WebSocketState;
 using Newtonsoft.Json.Linq;
 
+[assembly: InternalsVisibleTo("MorseL.Scaleout.Redis.Tests")]
 namespace MorseL.Client
 {
     /// <summary>
@@ -361,6 +363,11 @@ namespace MorseL.Client
             {
                 request.Completion.TrySetResult(descriptor.Result);
             }
+        }
+
+        internal void KillConnection()
+        {
+            _clientWebSocket.Dispose(false);
         }
 
         public async Task DisposeAsync()

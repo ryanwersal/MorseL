@@ -1,33 +1,24 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.Linq;
 using System.Net;
-using System.Text;
-using System.Threading;
-using System.Threading.Tasks;
 using Microsoft.AspNetCore.Builder;
-using Microsoft.AspNetCore.Builder.Internal;
 using Microsoft.AspNetCore.Hosting;
-using Microsoft.AspNetCore.Http;
-using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
-using MorseL;
 using MorseL.Extensions;
 using MorseL.Sockets.Middleware;
 
-namespace MorseL.Client.WebSockets.Tests
+namespace MorseL.Shared.Tests
 {
     public class SimpleMorseLServer<THub> where THub : Hub
     {
         private readonly IWebHost _webHost;
-        private static Action<IServiceCollection, IMorseLBuilder> ServiceConfigurator;
-        private static Action<IApplicationBuilder, IServiceProvider> ApplicationCongurator;
+        private static Action<IServiceCollection, IMorseLBuilder> _serviceConfigurator;
+        private static Action<IApplicationBuilder, IServiceProvider> _applicationCongurator;
 
         public SimpleMorseLServer(IPAddress address, int port, Action<IServiceCollection, IMorseLBuilder> services = null, Action<IApplicationBuilder, IServiceProvider> configure = null, IMiddleware[] middleware = null)
         {
-            ServiceConfigurator = services;
-            ApplicationCongurator = configure;
+            _serviceConfigurator = services;
+            _applicationCongurator = configure;
             _webHost = new WebHostBuilder()
                 .UseStartup<Startup>()
                 .UseKestrel(options =>
@@ -53,12 +44,12 @@ namespace MorseL.Client.WebSockets.Tests
             public void ConfigureServices(IServiceCollection services)
             {
                 var builder = services.AddMorseL();
-                ServiceConfigurator?.Invoke(services, builder);
+                _serviceConfigurator?.Invoke(services, builder);
             }
 
             public void Configure(IApplicationBuilder app, IServiceProvider serviceProvider, ILoggerFactory loggerFactory)
             {
-                ApplicationCongurator?.Invoke(app, serviceProvider);
+                _applicationCongurator?.Invoke(app, serviceProvider);
                 app.UseWebSockets();
                 app.MapMorseLHub<THub>("/hub");
             }

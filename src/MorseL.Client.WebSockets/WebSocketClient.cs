@@ -55,6 +55,8 @@ namespace MorseL.Client.WebSockets
             };
             _internalWebSocket.Closed += (sender, args) =>
             {
+                // We're closing, kill the receive loop (which causes listeners to break out)
+                _internalCts.Cancel();
                 Closed?.Invoke();
             };
             _internalWebSocket.Error += (sender, args) =>
@@ -256,7 +258,12 @@ namespace MorseL.Client.WebSockets
 
         public void Dispose()
         {
-            if (_internalWebSocket.State == WebSocketState.Open)
+            Dispose(true);
+        }
+
+        public void Dispose(bool waitForClose)
+        {
+            if (waitForClose && _internalWebSocket.State == WebSocketState.Open)
             {
                 CloseAsync(CancellationToken.None).Wait();
             }
@@ -264,10 +271,6 @@ namespace MorseL.Client.WebSockets
             _internalCts.Dispose();
             _internalWebSocket?.Dispose();
             _packets.CompleteAdding();
-
-            Connected = null;
-            Closed = null;
-            Error = null;
         }
     }
 
