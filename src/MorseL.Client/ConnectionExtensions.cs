@@ -1,11 +1,19 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Text;
+using System.Threading.Tasks;
 
 namespace MorseL.Client
 {
     public static class ConnectionExtensions
     {
+        public static void On(this Connection connection, string methodName, Action onData)
+        {
+            connection.On(methodName, new Type[0], data =>
+            {
+                onData.Invoke();
+            });
+        }
         public static void On<T1>(this Connection connection, string methodName, Action<T1> onData)
         {
             connection.On(methodName, new[] { typeof(T1) }, data =>

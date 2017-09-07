@@ -168,7 +168,7 @@ namespace MorseL.Tests
                 var expectedMethodName = string.IsNullOrWhiteSpace(methodName) ? "[Invalid Method Name]" : methodName;
                 var expectedArgumentList = arguments?.Length > 0 ? string.Join(", ", arguments) : "[No Parameters]";
 
-                await Task.Delay(100);
+                await Task.Delay(500);
 
                 Assert.NotNull(exception);
                 Assert.Equal(
@@ -215,7 +215,7 @@ namespace MorseL.Tests
                 var expectedMethodName = string.IsNullOrWhiteSpace(methodName) ? "[Invalid Method Name]" : methodName;
                 var expectedArgumentList = arguments?.Length > 0 ? string.Join(", ", arguments) : "[No Parameters]";
 
-                await Task.Delay(100);
+                await Task.Delay(500);
 
                 Assert.NotNull(exception);
                 Assert.Equal(
@@ -226,9 +226,120 @@ namespace MorseL.Tests
             }
         }
 
+        [Fact]
+        public async void LongSendFromClientDoesNotBlockClientReceive()
+        {
+            using (new SimpleMorseLServer<TestHub>(IPAddress.Any, 5000).Start())
+            {
+                var client = new Connection("ws://localhost:5000/hub", null, o => o.ThrowOnMissingHubMethodInvoked = true);
+                await client.StartAsync();
+
+                bool callbackFired = false;
+                client.On("Callback", new Type[0], (args) =>
+                {
+                    callbackFired = true;
+                });
+
+                var hugeMessage = new StringBuilder("");
+                for (var i = 0; i < 1000000; i++)
+                {
+                    hugeMessage.Append("abcdef");
+                }
+
+                await client.Invoke("PrimeCallback");
+                await client.Invoke("SendHugeData", hugeMessage.ToString());
+
+                Assert.True(callbackFired);
+
+                await client.DisposeAsync();
+            }
+        }
+
+        [Fact]
+        public async void HubMethodInvokeDuringLongMethodResponseTimeDoesNotBlockInvocation()
+        {
+            using (new SimpleMorseLServer<TestHub>(IPAddress.Any, 5000).Start())
+            {
+                var client = new Connection("ws://localhost:5000/hub", null, o => o.ThrowOnMissingHubMethodInvoked = true);
+                await client.StartAsync();
+
+                Task longRunningTask = null;
+                bool callbackFired = false;
+                client.On("Callback", new Type[0], async (args) =>
+                {
+                    await client.Invoke("DynamicCallback", "InResponseCallback");
+                });
+                client.On("InResponseCallback", () =>
+                {
+                    if (!longRunningTask?.IsCompleted == true)
+                    {
+                        callbackFired = true;
+                    }
+                });
+
+                await client.Invoke("PrimeCallback");
+                longRunningTask = client.Invoke("LongRunningMethod");
+                await longRunningTask;
+
+                Assert.True(callbackFired);
+
+                await client.DisposeAsync();
+            }
+        }
+
+        [Fact]
+        public async void LongDelayUntilServerResponseDoesNotBlockClientCallbacks()
+        {
+            using (new SimpleMorseLServer<TestHub>(IPAddress.Any, 5000).Start())
+            {
+                var client = new Connection("ws://localhost:5000/hub", null, o => o.ThrowOnMissingHubMethodInvoked = true);
+                await client.StartAsync();
+
+                Task longRunningTask = null;
+                bool callbackFired = false;
+                client.On("Callback", new Type[0], (args) =>
+                {
+                    if (!longRunningTask?.IsCompleted == true)
+                    {
+                        callbackFired = true;
+                    }
+                });
+
+                await client.Invoke("PrimeCallback");
+                longRunningTask = client.Invoke("LongRunningMethod");
+                await longRunningTask;
+
+                Assert.True(callbackFired);
+
+                await client.DisposeAsync();
+            }
+        }
+
         public class TestHub : Hub
         {
             public void FooBar() { }
+
+            public Task PrimeCallback()
+            {
+                Task.Delay(50).ContinueWith((t) => Client.InvokeAsync("Callback"));
+                return Task.CompletedTask;
+            }
+
+            public Task DynamicCallback(string callbackName)
+            {
+                Task.Delay(50).ContinueWith((t) => Client.InvokeAsync(callbackName));
+                return Task.CompletedTask;
+            }
+
+            public async Task LongRunningMethod()
+            {
+                await Task.Delay(2000);
+            }
+
+            public async Task SendHugeData()
+            {
+                await Task.Delay(500);
+            }
 
             public async Task<int> CallInvalidClientMethod(string methodToCall, params object[] arguments)
             {
