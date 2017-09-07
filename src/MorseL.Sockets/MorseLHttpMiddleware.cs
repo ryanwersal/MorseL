@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Net.WebSockets;
+using System.Runtime.ExceptionServices;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
@@ -48,10 +49,13 @@ namespace MorseL.Sockets
     /// observed through out the entire process.
     /// </para>
     /// </summary>
-    public class MorseLHttpMiddleware
+    public class MorseLHttpMiddleware : IDisposable
     {
         private readonly ILogger _logger;
         private readonly RequestDelegate _next;
+        private readonly CancellationTokenSource _cts = new CancellationTokenSource();
+        private Exception _pendingException;
+
         private Type HandlerType { get; }
 
         public MorseLHttpMiddleware(ILogger<MorseLHttpMiddleware> logger, RequestDelegate next, Type handlerType)
@@ -93,8 +97,19 @@ namespace MorseL.Sockets
                             if (result.MessageType == WebSocketMessageType.Text)
                             {
                                 // We call the connection arg'd method directly to allow for middleware to override the IChannel
-                                await handler.ReceiveAsync(connection, serializedInvocationDescriptor)
-                                    .ConfigureAwait(false);
+                                var unawaitedTask = Task.Run(async () =>
+                                {
+                                    try
+                                    {
+                                        await handler.ReceiveAsync(connection, serializedInvocationDescriptor).ConfigureAwait(false);
+                                    }
+                                    catch (Exception exception)
+                                    {
+                                        _pendingException = exception;
+                                        _cts.Cancel();
+                                    }
+
+                                }).ConfigureAwait(false);
                             }
                             else if (result.MessageType == WebSocketMessageType.Close)
                             {
@@ -136,7 +151,29 @@ namespace MorseL.Sockets
                 {
                     do
                     {
-                        result = await socket.ReceiveAsync(buffer, CancellationToken.None).ConfigureAwait(false);
+                        // WTF is going on?
+                        // .net core doesn't seem to care about a passed in cancellation
+                        // token, that's what :(
+                        var task = socket.ReceiveAsync(buffer, _cts.Token);
+
+                        while (!task.IsCompleted && !_cts.IsCancellationRequested)
+                        {
+                            await Task.Delay(100).ConfigureAwait(false);
+                        }
+
+                        if (_cts.IsCancellationRequested)
+                        {
+                            if (_pendingException != null)
+                            {
+                                ExceptionDispatchInfo.Capture(_pendingException).Throw();
+                            }
+
+                            throw new MorseLException("RecieveLoop halted for unknown reason!");
+                        }
+
+                        // Grab or throw based on the actual task result
+                        result = await task;
+
                         ms.Write(buffer.Array, buffer.Offset, result.Count);
                     } while (!result.EndOfMessage);
 
@@ -178,6 +215,11 @@ namespace MorseL.Sockets
                         .ConfigureAwait(false);
                 }
             }
+        }
+
+        public void Dispose()
+        {
+            _cts?.Dispose();
         }
     }
 }

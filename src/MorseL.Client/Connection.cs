@@ -339,7 +339,7 @@ namespace MorseL.Client
                     _logger?.LogError(new EventId(), e, $"Exception thrown during registered callback for {descriptor.MethodName}");
                     Error?.Invoke(new Exception($"Exception thrown during registered callback for {descriptor.MethodName}", e));
                 }
-            });
+            }).ConfigureAwait(false);
 
             return Task.CompletedTask;
         }
