@@ -124,7 +124,7 @@ namespace MorseL
         private void DiscoverHubMethods()
         {
             var hubType = typeof(THub);
-            foreach (var methodInfo in hubType.GetMethods().Where(m => IsHubMethod(m)))
+            foreach (var methodInfo in hubType.GetMethods().Where(IsHubMethod))
             {
                 var methodName = methodInfo.Name;
 
@@ -136,9 +136,9 @@ namespace MorseL
                 var executor = ObjectMethodExecutor.Create(methodInfo, hubType.GetTypeInfo());
                 _methods[methodName] = new HubMethodDescriptor(executor);
 
-                if (_logger.IsEnabled(LogLevel.Debug))
+                if (_logger.IsEnabled(LogLevel.Trace))
                 {
-                    _logger.LogDebug("Hub method '{methodName}' is bound", methodName);
+                    _logger.LogTrace("Hub method '{methodName}' is bound", methodName);
                 }
             }
         }
