@@ -5,6 +5,7 @@ using Xunit;
 using MorseL.Common;
 using Microsoft.Extensions.DependencyInjection;
 using System;
+using System.Collections.Generic;
 using System.Security.Cryptography;
 using System.Text;
 using Microsoft.AspNetCore.Builder;
@@ -315,6 +316,37 @@ namespace MorseL.Tests
             }
         }
 
+        [Theory]
+        [InlineData(2)]
+        [InlineData(4)]
+        [InlineData(8)]
+        [InlineData(16)]
+        public async Task AsyncCallToMethodForResultGetsResultsAsExpected(int count)
+        {
+            using (new SimpleMorseLServer<TestHub>(IPAddress.Any, 5000).Start())
+            {
+                var client = new Connection("ws://localhost:5000/hub");
+                await client.StartAsync();
+
+                var taskMap = new Dictionary<Task<int>, int>();
+                var tasks = new List<Task<int>>();
+
+                for (var i = 0; i < count; i++)
+                {
+                    var task = client.Invoke<int>("ExpectedResult", i);
+                    taskMap[task] = i;
+                    tasks.Add(task);
+                }
+
+                await Task.WhenAll(tasks);
+
+                foreach (var pair in taskMap)
+                {
+                    Assert.Equal(pair.Value, pair.Key.Result);
+                }
+            }
+        }
+
         public class TestHub : Hub
         {
             public void FooBar() { }
@@ -329,6 +361,11 @@ namespace MorseL.Tests
             {
                 Task.Delay(50).ContinueWith((t) => Client.InvokeAsync(callbackName));
                 return Task.CompletedTask;
+            }
+
+            public Task<int> ExpectedResult(int result)
+            {
+                return Task.FromResult(result);
             }
 
             public async Task LongRunningMethod()

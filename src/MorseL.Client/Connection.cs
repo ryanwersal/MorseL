@@ -90,11 +90,11 @@ namespace MorseL.Client
             _middleware.Add(middleware);
         }
 
-        public async Task StartAsync()
+        public async Task StartAsync(CancellationToken ct = default(CancellationToken))
         {
             await Task.Run(async () =>
             {
-                await _clientWebSocket.ConnectAsync().ConfigureAwait(false);
+                await _clientWebSocket.ConnectAsync(ct).ConfigureAwait(false);
 
                 _receiveLoopTask = Receive(async message =>
                 {
@@ -131,14 +131,14 @@ namespace MorseL.Client
                             HandleInvokeResult(resultDescriptor);
                             break;
                     }
-                });
+                }, ct);
                 _receiveLoopTask.ContinueWith(task => {
                     if (task.IsFaulted)
                     {
                         Error?.Invoke(task.Exception);
                     }
                 });
-            }).ConfigureAwait(false);
+            }, ct).ConfigureAwait(false);
         }
 
         private Task HandleMissingReceivedInvocationDescriptor(JObject invocationDescriptor)
@@ -370,11 +370,11 @@ namespace MorseL.Client
             _clientWebSocket.Dispose(false);
         }
 
-        public async Task DisposeAsync()
+        public async Task DisposeAsync(CancellationToken ct = default(CancellationToken))
         {
             if (_clientWebSocket.State != WebSocketState.Closed)
             {
-                await _clientWebSocket.CloseAsync(CancellationToken.None).ConfigureAwait(false);
+                await _clientWebSocket.CloseAsync(ct).ConfigureAwait(false);
             }
 
             _clientWebSocket.Dispose();
@@ -385,13 +385,13 @@ namespace MorseL.Client
             }
         }
 
-        private async Task Receive(Func<Message, Task> handleMessage)
+        private async Task Receive(Func<Message, Task> handleMessage, CancellationToken ct)
         {
-            while (_clientWebSocket.State == WebSocketState.Open)
+            while (!ct.IsCancellationRequested && _clientWebSocket.State == WebSocketState.Open)
             {
                 try
                 {
-                    var receivedMessage = await _clientWebSocket.RecieveAsync(CancellationToken.None).ConfigureAwait(false);
+                    var receivedMessage = await _clientWebSocket.RecieveAsync(ct).ConfigureAwait(false);
 
                     var receiveIterator = _middleware.GetEnumerator();
                     RecieveDelegate receiveDelegator = null;
