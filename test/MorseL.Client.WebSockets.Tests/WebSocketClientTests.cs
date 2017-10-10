@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Net;
 using System.Net.Sockets;
 using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
 using Xunit;
 using Xunit.Sdk;
@@ -14,7 +15,7 @@ namespace MorseL.Client.WebSockets.Tests
     {
         // TODO : The internal web socket also times out - but with a generic SocketException...
         [Fact(DisplayName = nameof(ConnectTimesOutAfterXSecondsAndThrowsException))]
-        public async void ConnectTimesOutAfterXSecondsAndThrowsException()
+        public async Task ConnectTimesOutAfterXSecondsAndThrowsException()
         {
             using (var tcpListener = new SimpleTcpListener(new IPEndPoint(IPAddress.Any, 5000)))
             {
@@ -27,7 +28,7 @@ namespace MorseL.Client.WebSockets.Tests
         }
 
         [Fact(DisplayName = nameof(DisconnectingUnopenClientThrowsException))]
-        public async void DisconnectingUnopenClientThrowsException()
+        public async Task DisconnectingUnopenClientThrowsException()
         {
             var client = new WebSocketClient("ws://localhost:5000");
             try
@@ -41,7 +42,7 @@ namespace MorseL.Client.WebSockets.Tests
         }
 
         [Fact(DisplayName = nameof(ConnectCalledOnConnectComplete))]
-        public async void ConnectCalledOnConnectComplete()
+        public async Task ConnectCalledOnConnectComplete()
         {
             using (new SimpleWebSocketServer(IPAddress.Any, 5000).Start())
             {
@@ -51,6 +52,24 @@ namespace MorseL.Client.WebSockets.Tests
                 await client.ConnectAsync();
                 Assert.True(connectedCalled);
             }
+        }
+
+        [Fact]
+        public Task CancellationTokenCancelsConnectRequest()
+        {
+            using (new SimpleWebSocketServer(IPAddress.Any, 5000).Start())
+            {
+                var client = new WebSocketClient("ws://localhost:5000");
+
+                var cts = new CancellationTokenSource();
+                var connectTask = client.ConnectAsync(cts.Token);
+
+                cts.Cancel();
+                Assert.True(cts.IsCancellationRequested);
+                Assert.True(connectTask.IsCanceled);
+            }
+
+            return Task.CompletedTask;
         }
     }
 }
