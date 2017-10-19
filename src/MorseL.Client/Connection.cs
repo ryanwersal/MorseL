@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Text;
 using System.Threading;
@@ -18,6 +19,7 @@ using WebSocketState = WebSocket4Net.WebSocketState;
 using Newtonsoft.Json.Linq;
 
 [assembly: InternalsVisibleTo("MorseL.Scaleout.Redis.Tests")]
+[assembly: InternalsVisibleTo("MorseL.Tests")]
 namespace MorseL.Client
 {
     /// <summary>
@@ -424,8 +426,23 @@ namespace MorseL.Client
                         })
                         .ConfigureAwait(false);
                 }
-                catch (WebSocketClosedException)
+                catch (WebSocketClosedException e)
                 {
+                    // We're closing so we need to unblock any pending TaskCompletionSources
+                    InvocationRequest[] calls;
+
+                    lock (_pendingCallsLock)
+                    {
+                        calls = _pendingCalls.Values.ToArray();
+                        _pendingCalls.Clear();
+                    }
+
+                    foreach (var request in calls)
+                    {
+                        request.Registration.Dispose();
+                        request.Completion.TrySetException(e);
+                    }
+
                     // Eat the exception because we're closing
                     // But we cancel out because the socket is closed
                     break;
