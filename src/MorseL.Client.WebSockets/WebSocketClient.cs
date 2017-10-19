@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Net;
+using System.Runtime.ExceptionServices;
 using System.Security.Authentication;
 using System.Text;
 using System.Threading;
@@ -90,7 +91,22 @@ namespace MorseL.Client.WebSockets
                     while (!linkedCts.IsCancellationRequested
                            && (_internalWebSocket.State == WebSocketState.None || _internalWebSocket.State == WebSocketState.Connecting))
                     {
-                        await Task.Delay(100, linkedCts.Token);
+                        try
+                        {
+                            await Task.Delay(100, linkedCts.Token);
+                        }
+                        catch (TaskCanceledException)
+                        {
+                            // If cancelToken was cancelled we'll rethrow below on task.ContinueWith
+                            // If not, internalCts was cancelled which should coincide with an exception
+                            // If we don't have an exception then we got problems
+                            if (exception == null)
+                            {
+                                throw;
+                            }
+
+                            break;
+                        }
                     }
                 }, linkedCts.Token);
 
@@ -98,7 +114,7 @@ namespace MorseL.Client.WebSockets
 
                 if (exception != null)
                 {
-                    throw exception;
+                    ExceptionDispatchInfo.Capture(exception).Throw();
                 }
             }, linkedCts.Token);
 
@@ -153,7 +169,7 @@ namespace MorseL.Client.WebSockets
 
                 if (exception != null)
                 {
-                    throw exception;
+                    ExceptionDispatchInfo.Capture(exception).Throw();
                 }
             }, cancelToken);
             task.ContinueWith(t =>

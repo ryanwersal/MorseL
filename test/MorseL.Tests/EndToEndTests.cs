@@ -6,6 +6,7 @@ using MorseL.Common;
 using Microsoft.Extensions.DependencyInjection;
 using System;
 using System.Collections.Generic;
+using System.Net.Sockets;
 using System.Security.Cryptography;
 using System.Text;
 using Microsoft.AspNetCore.Builder;
@@ -222,6 +223,36 @@ namespace MorseL.Tests
                 Assert.Equal(
                     $"Error: Cannot find method \"{expectedMethodName}({expectedArgumentList})\" from {client.ConnectionId}",
                     exception.Message);
+
+                await client.DisposeAsync();
+            }
+        }
+
+        [Fact]
+        public async void ClientThrowsUsefulExceptionWhenFailsToConnectNonExistentHost()
+        {
+            var client = new Connection("ws://localhost:5000/hub", null, o => o.ThrowOnMissingHubMethodInvoked = true);
+
+            await Assert.ThrowsAnyAsync<SocketException>(() => client.StartAsync());
+
+            await client.DisposeAsync();
+        }
+
+        [Fact]
+        public async void ServerClosesDuringLongSendFromClientThrowsExceptionOnInvoker()
+        {
+            using (var server = new SimpleMorseLServer<TestHub>(IPAddress.Any, 5000).Start())
+            {
+                var client = new Connection("ws://localhost:5000/hub", null,
+                    o => o.ThrowOnMissingHubMethodInvoked = true);
+                await client.StartAsync();
+
+                var task = Task.Run(() => client.Invoke("LongRunningMethod"));
+
+                // Disconnect the client
+                server.Dispose();
+
+                await Assert.ThrowsAnyAsync<WebSocketClosedException>(() => task);
 
                 await client.DisposeAsync();
             }
