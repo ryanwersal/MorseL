@@ -21,12 +21,14 @@ namespace MorseL.Client.WebSockets.Tests
         public SimpleWebSocketServer(IPAddress address, int port)
         {
             _webHost = new WebHostBuilder()
-                .UseStartup<Startup>()
                 .UseKestrel(options =>
                 {
-                    options.UseConnectionLogging();
+                    options.Listen(address, port, listenOptions =>
+                    {
+                        listenOptions.UseConnectionLogging();
+                    });
                 })
-                .UseUrls($"http://{address}:{port}")
+                .UseStartup<Startup>()
                 .Build();
         }
 
