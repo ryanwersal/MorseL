@@ -402,7 +402,8 @@ namespace MorseL
                     {
                         var policy = await AuthorizationPolicy.CombineAsync(provider, effectiveAuthorizeData);
 
-                        if (!await authorizationService.AuthorizeAsync(user, context, policy))
+                        var authResult = await authorizationService.AuthorizeAsync(user, context, policy);
+                        if (!authResult.Succeeded)
                         {
                             return false;
                         }

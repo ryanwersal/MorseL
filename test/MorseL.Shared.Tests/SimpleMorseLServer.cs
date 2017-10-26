@@ -20,12 +20,15 @@ namespace MorseL.Shared.Tests
             _serviceConfigurator = services;
             _applicationCongurator = configure;
             _webHost = new WebHostBuilder()
-                .UseStartup<Startup>()
                 .UseKestrel(options =>
                 {
-                    options.UseConnectionLogging();
+                    options.Listen(address, port, listenOptions => 
+                    {
+                        listenOptions.UseConnectionLogging();
+                    });
+
                 })
-                .UseUrls($"http://{address}:{port}")
+                .UseStartup<Startup>()
                 .Build();
         }
 
