@@ -44,9 +44,9 @@ namespace MorseL.Extensions
         /// <param name="builder">The MorseLBuilder object</param>
         /// <param name="lifetime">The lifetime the middleware should be created and adhere to.</param>
         /// <returns></returns>
-        public static IMorseLBuilder AddMiddleware<TMiddleware>(this IMorseLBuilder builder, ServiceLifetime lifetime) where TMiddleware : IMiddleware
+        public static IMorseLBuilder AddMiddleware<TMiddleware>(this IMorseLBuilder builder, ServiceLifetime lifetime) where TMiddleware : Sockets.Middleware.IMiddleware
         {
-            builder.Services.TryAddEnumerable(ServiceDescriptor.Describe(typeof(IMiddleware), typeof(TMiddleware), lifetime));
+            builder.Services.TryAddEnumerable(ServiceDescriptor.Describe(typeof(Sockets.Middleware.IMiddleware), typeof(TMiddleware), lifetime));
             return builder;
         }
 

@@ -49,12 +49,10 @@ namespace MorseL.Sockets
     /// observed through out the entire process.
     /// </para>
     /// </summary>
-    public class MorseLHttpMiddleware : IDisposable
+    public class MorseLHttpMiddleware
     {
         private readonly ILogger _logger;
         private readonly RequestDelegate _next;
-        private readonly CancellationTokenSource _cts = new CancellationTokenSource();
-        private Exception _pendingException;
 
         private Type HandlerType { get; }
 
@@ -72,6 +70,9 @@ namespace MorseL.Sockets
                 await _next(context);
                 return;
             }
+
+            var cts = new CancellationTokenSource();
+            Exception pendingException = null;
 
             using (var serviceScope = context.RequestServices.CreateScope())
             {
@@ -91,7 +92,7 @@ namespace MorseL.Sockets
                     // TODO : Consider/Decide on pulling web socket manager outside of handler
                     var connection = await handler.OnConnected(socket, context).ConfigureAwait(false);
 
-                    await Receive(socket, connection, middleware,
+                    await Receive(socket, connection, middleware, cts,
                         async (result, serializedInvocationDescriptor) =>
                         {
                             if (result.MessageType == WebSocketMessageType.Text)
@@ -105,8 +106,11 @@ namespace MorseL.Sockets
                                     }
                                     catch (Exception exception)
                                     {
-                                        _pendingException = exception;
-                                        _cts.Cancel();
+                                        // An exception here means it was thrown during message handling (not in the Hub method itself)
+                                        // This is a big issue (likely message serialization) and can't be "saved"
+                                        // We'll store the exception and rethrow after the receive loop is brought down
+                                        pendingException = exception;
+                                        cts.Cancel();
                                     }
 
                                 }).ConfigureAwait(false);
@@ -116,6 +120,12 @@ namespace MorseL.Sockets
                                 await handler.OnDisconnected(socket, null);
                             }
                         }).ConfigureAwait(false);
+
+                    // Rethrow any exception thrown during message processing that broke our receive loop
+                    if (pendingException != null)
+                    {
+                        ExceptionDispatchInfo.Capture(pendingException).Throw();
+                    }
                 }
                 catch (Exception exception)
                 {
@@ -139,7 +149,9 @@ namespace MorseL.Sockets
             }
         }
 
-        private async Task Receive(WebSocket socket, Connection connection, List<IMiddleware> middleware, Func<WebSocketReceiveResult, string, Task> handleMessage)
+        private async Task Receive(
+            WebSocket socket, Connection connection, List<IMiddleware> middleware,
+            CancellationTokenSource cts, Func<WebSocketReceiveResult, string, Task> handleMessage)
         {
             while (socket.State == WebSocketState.Open)
             {
@@ -154,21 +166,17 @@ namespace MorseL.Sockets
                         // WTF is going on?
                         // .net core doesn't seem to care about a passed in cancellation
                         // token, that's what :(
-                        var task = socket.ReceiveAsync(buffer, _cts.Token);
+                        var task = socket.ReceiveAsync(buffer, cts.Token);
 
-                        while (!task.IsCompleted && !_cts.IsCancellationRequested)
+                        while (!task.IsCompleted && !cts.IsCancellationRequested)
                         {
                             await Task.Delay(100).ConfigureAwait(false);
                         }
 
-                        if (_cts.IsCancellationRequested)
+                        if (cts.IsCancellationRequested)
                         {
-                            if (_pendingException != null)
-                            {
-                                ExceptionDispatchInfo.Capture(_pendingException).Throw();
-                            }
-
-                            throw new MorseLException("RecieveLoop halted for unknown reason!");
+                            // Stop. Immediately
+                            return;
                         }
 
                         // Grab or throw based on the actual task result
@@ -215,11 +223,6 @@ namespace MorseL.Sockets
                         .ConfigureAwait(false);
                 }
             }
-        }
-
-        public void Dispose()
-        {
-            _cts?.Dispose();
         }
     }
 }

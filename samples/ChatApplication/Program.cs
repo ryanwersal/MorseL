@@ -3,6 +3,7 @@ using System.Security.Authentication;
 using System.Security.Cryptography.X509Certificates;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Server.Kestrel.Https;
+using System.Net;
 
 namespace ChatApplication
 {
@@ -11,17 +12,24 @@ namespace ChatApplication
         public static void Main(string[] args)
         {
             var host = new WebHostBuilder()
-                .UseUrls("http://localhost:5000", "https://localhost:5001")
                 .UseKestrel(options =>
                 {
-                    options.UseConnectionLogging();
-                    options.UseHttps(new HttpsConnectionFilterOptions()
+                    options.Listen(IPAddress.Loopback, 5000, listenOptions =>
                     {
-                        ServerCertificate = new X509Certificate2("server.pfx"),
-                        ClientCertificateMode = ClientCertificateMode.AllowCertificate,
-                        SslProtocols = SslProtocols.Tls | SslProtocols.Tls11,
-                        CheckCertificateRevocation = false,
-                        ClientCertificateValidation = (certificate2, chain, arg3) => true
+                        listenOptions.UseConnectionLogging();
+                    });
+                    options.Listen(IPAddress.Loopback, 5001, listenOptions =>
+                    {
+                        listenOptions
+                            .UseConnectionLogging()
+                            .UseHttps(new HttpsConnectionAdapterOptions
+                            {
+                                ServerCertificate = new X509Certificate2("server.pfx"),
+                                ClientCertificateMode = ClientCertificateMode.AllowCertificate,
+                                SslProtocols = SslProtocols.Tls | SslProtocols.Tls11,
+                                CheckCertificateRevocation = false,
+                                ClientCertificateValidation = (certificate2, chain, arg3) => true
+                            });
                     });
                 })
                 .UseContentRoot(Directory.GetCurrentDirectory())

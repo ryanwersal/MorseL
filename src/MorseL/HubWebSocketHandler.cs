@@ -168,10 +168,9 @@ namespace MorseL
             {
                 invocationDescriptor = Json.DeserializeInvocationDescriptor(serializedInvocationDescriptor, _methods.Values.Select(d => d.MethodExecutor.MethodInfo).ToArray());
             }
-            catch (Exception e)
+            catch (Exception)
             {
-                await HandleUnparseableReceivedInvocationDescriptor(connection, serializedInvocationDescriptor, e);
-                return;
+                // Ignore for now and retry as a missing method
             }
 
             if (invocationDescriptor == null)
@@ -303,11 +302,10 @@ namespace MorseL
 
             _logger?.LogError(new EventId(), exception, $"Invalid message \"{serializedInvocationDescriptor}\" received from {connection.Id}");
 
-            // TODO : Move to a Error type that can be handled specifically
             // Since we don't have an invocation descriptor we can't return an invocation result
             return connection.Channel.SendMessageAsync(new Message()
             {
-                MessageType = MessageType.Text,
+                MessageType = MessageType.Error,
                 Data = $"Invalid message \"{serializedInvocationDescriptor}\""
             });
         }
@@ -402,7 +400,8 @@ namespace MorseL
                     {
                         var policy = await AuthorizationPolicy.CombineAsync(provider, effectiveAuthorizeData);
 
-                        if (!await authorizationService.AuthorizeAsync(user, context, policy))
+                        var authResult = await authorizationService.AuthorizeAsync(user, context, policy);
+                        if (!authResult.Succeeded)
                         {
                             return false;
                         }
