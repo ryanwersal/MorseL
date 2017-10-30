@@ -43,5 +43,14 @@ namespace MorseL.Client
         /// Defaults to true
         /// </summary>
         public bool RethrowUnobservedExceptions { get; set; } = true;
+
+        /// <summary>
+        /// <para>
+        /// Causes MorseL to throw an exception (handled via <see cref="Connection.Error"/>) when
+        /// a hub reports a method invocation was invalid. This is a critical and
+        /// exceptional error case.
+        /// </para>
+        /// </summary>
+        public bool ThrowOnInvalidRequest { get; set; } = true;
     }
 }
