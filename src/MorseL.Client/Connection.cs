@@ -132,6 +132,9 @@ namespace MorseL.Client
                             var resultDescriptor = Json.DeserializeInvocationResultDescriptor(message.Data, _pendingCalls);
                             HandleInvokeResult(resultDescriptor);
                             break;
+                        case MessageType.Error:
+                            await HandleErrorMessage(message);
+                            break;
                     }
                 }, ct);
                 _receiveLoopTask.ContinueWith(task => {
@@ -213,6 +216,19 @@ namespace MorseL.Client
             // TODO : Move to a Error type that can be handled specifically
             // Since we don't have an invocation descriptor we can't return an invocation result
             return SendMessageAsync($"Error: Invalid message \"{serializedInvocationDescriptor}\"");
+        }
+
+        private Task HandleErrorMessage(Message message)
+        {
+            // We must have sent some bad JSON?
+            if (_options.ThrowOnInvalidRequest)
+            {
+                throw new MorseLException(message.Data);
+            }
+
+            _logger?.LogError(new EventId(), message.Data);
+
+            return Task.CompletedTask;
         }
 
         public void On(string methodName, Type[] types, Action<object[]> handler)

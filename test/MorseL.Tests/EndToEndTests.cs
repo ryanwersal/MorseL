@@ -170,7 +170,7 @@ namespace MorseL.Tests
                 var expectedMethodName = string.IsNullOrWhiteSpace(methodName) ? "[Invalid Method Name]" : methodName;
                 var expectedArgumentList = arguments?.Length > 0 ? string.Join(", ", arguments) : "[No Parameters]";
 
-                await Task.Delay(500);
+                await Task.Delay(5000);
 
                 Assert.NotNull(exception);
                 Assert.Equal(
@@ -378,6 +378,96 @@ namespace MorseL.Tests
             }
         }
 
+        [Fact]
+        public async Task HubThrowingExceptionDoesntCausePerpetualException()
+        {
+            using (new SimpleMorseLServer<TestHub>(IPAddress.Any, 5000).Start())
+            {
+                var client = new Connection("ws://localhost:5000/hub");
+                await client.StartAsync();
+
+                try
+                {
+                    await client.Invoke(nameof(TestHub.ThrowException));
+                }
+                catch (Exception)
+                {
+                    // Ignore
+                }
+
+                client = new Connection("ws://localhost:5000/hub");
+                await client.StartAsync();
+
+                await client.Invoke("FooBar");
+            }
+        }
+
+        [Fact]
+        public async Task HubInvalidMethodExceptionDoesntCausePerpetualException()
+        {
+            using (new SimpleMorseLServer<TestHub>(IPAddress.Any, 5000, (s, b) =>
+            {
+                s.Configure<Extensions.MorseLOptions>(o => o.ThrowOnInvalidMessage = false);
+            }).Start())
+            {
+                var client = new Connection("ws://localhost:5000/hub", options: o =>
+                {
+                    o.ThrowOnInvalidMessage = true;
+                    o.RethrowUnobservedExceptions = true;
+                    o.ThrowOnMissingHubMethodInvoked = true;
+                    o.ThrowOnMissingMethodRequest = true;
+                });
+                await client.StartAsync();
+
+                try
+                {
+                    await client.Invoke(nameof(TestHub.ThrowInvalidMethodException), "InvalidArgument");
+                }
+                catch (Exception)
+                {
+                    // Ignore
+                }
+
+                client = new Connection("ws://localhost:5000/hub");
+                await client.StartAsync();
+
+                await client.Invoke("FooBar");
+            }
+        }
+
+        [Fact]
+        public async Task HubMissingMethodExceptionDoesntCausePerpetualException()
+        {
+            using (new SimpleMorseLServer<TestHub>(IPAddress.Any, 5000, (s, b) =>
+            {
+                s.Configure<Extensions.MorseLOptions>(o => o.ThrowOnInvalidMessage = false);
+            }).Start())
+            {
+                var client = new Connection("ws://localhost:5000/hub", options: o =>
+                {
+                    o.ThrowOnInvalidMessage = true;
+                    o.RethrowUnobservedExceptions = true;
+                    o.ThrowOnMissingHubMethodInvoked = true;
+                    o.ThrowOnMissingMethodRequest = true;
+                });
+                await client.StartAsync();
+
+                try
+                {
+                    await client.Invoke("SomeNonExistentMethod");
+                }
+                catch (Exception)
+                {
+                    // Ignore
+                }
+
+                client = new Connection("ws://localhost:5000/hub");
+                await client.StartAsync();
+
+                await client.Invoke("FooBar");
+            }
+        }
+
         public class TestHub : Hub
         {
             public void FooBar() { }
@@ -407,6 +497,16 @@ namespace MorseL.Tests
             public async Task SendHugeData()
             {
                 await Task.Delay(500);
+            }
+
+            public Task ThrowException()
+            {
+                throw new Exception("Derp");
+            }
+
+            public Task ThrowInvalidMethodException(int value)
+            {
+                throw new Exception("Derp");
             }
 
             public async Task<int> CallInvalidClientMethod(string methodToCall, params object[] arguments)
