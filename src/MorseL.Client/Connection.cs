@@ -405,6 +405,8 @@ namespace MorseL.Client
 
         private async Task Receive(Func<Message, Task> handleMessage, CancellationToken ct)
         {
+            Exception closingException = null;
+
             while (!ct.IsCancellationRequested && _clientWebSocket.State == WebSocketState.Open)
             {
                 try
@@ -444,22 +446,9 @@ namespace MorseL.Client
                 }
                 catch (WebSocketClosedException e)
                 {
-                    // We're closing so we need to unblock any pending TaskCompletionSources
-                    InvocationRequest[] calls;
-
-                    lock (_pendingCallsLock)
-                    {
-                        calls = _pendingCalls.Values.ToArray();
-                        _pendingCalls.Clear();
-                    }
-
-                    foreach (var request in calls)
-                    {
-                        request.Registration.Dispose();
-                        request.Completion.TrySetException(e);
-                    }
-
                     // Eat the exception because we're closing
+                    closingException = e;
+
                     // But we cancel out because the socket is closed
                     break;
                 }
@@ -467,6 +456,21 @@ namespace MorseL.Client
                 {
                     Error?.Invoke(e);
                 }
+            }
+
+            // We're closing so we need to unblock any pending TaskCompletionSources
+            InvocationRequest[] calls;
+
+            lock (_pendingCallsLock)
+            {
+                calls = _pendingCalls.Values.ToArray();
+                _pendingCalls.Clear();
+            }
+
+            foreach (var request in calls)
+            {
+                request.Registration.Dispose();
+                request.Completion.TrySetException(closingException ?? new WebSocketClosedException("The websocket has been closed!"));
             }
         }
 
