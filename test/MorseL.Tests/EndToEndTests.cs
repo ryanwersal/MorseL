@@ -259,6 +259,26 @@ namespace MorseL.Tests
         }
 
         [Fact]
+        public async void ServerClosingConnectionDuringLongSendFromClientThrowsExceptionOnInvoker()
+        {
+            using (var server = new SimpleMorseLServer<TestHub>(IPAddress.Any, 5000).Start())
+            {
+                var client = new Connection("ws://localhost:5000/hub", null,
+                    o => o.ThrowOnMissingHubMethodInvoked = true);
+                await client.StartAsync();
+
+                var task = Task.Run(() => client.Invoke("LongRunningMethod"));
+
+                // Disconnect the client
+                await client.DisposeAsync();
+
+                await Assert.ThrowsAnyAsync<WebSocketClosedException>(() => task);
+
+                await client.DisposeAsync();
+            }
+        }
+
+        [Fact]
         public async void LongSendFromClientDoesNotBlockClientReceive()
         {
             using (new SimpleMorseLServer<TestHub>(IPAddress.Any, 5000).Start())
