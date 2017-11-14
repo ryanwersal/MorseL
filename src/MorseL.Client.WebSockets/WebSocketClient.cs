@@ -8,7 +8,9 @@ using System.Threading;
 using System.Threading.Tasks;
 using Nito.AsyncEx;
 using SuperSocket.ClientEngine;
+using SuperSocket.ClientEngine.Proxy;
 using WebSocket4Net;
+
 
 namespace MorseL.Client.WebSockets
 {
@@ -47,6 +49,8 @@ namespace MorseL.Client.WebSockets
                 Options.ReceiveBufferSize);
             Security = _internalWebSocket.Security;
             securityConfig?.Invoke(Security);
+
+            _internalWebSocket.Proxy = Options.Proxy;
             _internalWebSocket.EnableAutoSendPing = Options.EnableAutoSendPing;
             _internalWebSocket.AutoSendPingInterval = Options.AutoSendPingIntervalSeconds;
 
@@ -303,6 +307,7 @@ namespace MorseL.Client.WebSockets
         public int ReceiveBufferSize { get; set; } = 0;
         public bool EnableAutoSendPing { get; set; } = false;
         public int AutoSendPingIntervalSeconds { get; set; } = 120;
+        public IProxyConnector Proxy { get; set; } = null;
     }
 
     public class WebSocketClientException : Exception

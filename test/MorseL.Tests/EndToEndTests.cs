@@ -1,26 +1,35 @@
 ﻿using System.Net;
-using System.Threading.Tasks;
 using MorseL.Client;
 using Xunit;
 using MorseL.Common;
 using Microsoft.Extensions.DependencyInjection;
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Net.Sockets;
 using System.Security.Cryptography;
 using System.Text;
+using System.Threading.Tasks;
 using Microsoft.AspNetCore.Builder;
 using MorseL.Client.Middleware;
 using MorseL.Client.WebSockets;
 using MorseL.Extensions;
 using MorseL.Shared.Tests;
 using MorseL.Sockets.Middleware;
+using Xunit.Abstractions;
 
 namespace MorseL.Tests
 {
     [Trait("Target", "EndToEndTests")]
     public class EndToEndTests
     {
+        private readonly ITestOutputHelper _testOutputHelper;
+
+        public EndToEndTests(ITestOutputHelper testOutputHelper)
+        {
+            _testOutputHelper = testOutputHelper;
+        }
+
         [Fact]
         public async void ConnectedCalledWhenClientConnectionEstablished()
         {
@@ -485,6 +494,95 @@ namespace MorseL.Tests
                 await client.StartAsync();
 
                 await client.Invoke("FooBar");
+            }
+        }
+
+        [Theory]
+        [InlineData(1)]
+        [InlineData(2)]
+        [InlineData(4)]
+        [InlineData(8)]
+        [InlineData(16)]
+        [InlineData(32)]
+        [InlineData(64)]
+        public async Task ParallelCallsToHubMethodsForResultDoesntDie(int count)
+        {
+            using (new SimpleMorseLServer<TestHub>(IPAddress.Any, 5000, (s, b) =>
+            {
+                s.Configure<Extensions.MorseLOptions>(o => o.ThrowOnInvalidMessage = false);
+            }).Start())
+            {
+                var client = new Connection("ws://localhost:5000/hub", options: o =>
+                {
+                    o.ThrowOnInvalidMessage = true;
+                    o.RethrowUnobservedExceptions = true;
+                    o.ThrowOnMissingHubMethodInvoked = true;
+                    o.ThrowOnMissingMethodRequest = true;
+                });
+                await client.StartAsync();
+
+                var tasks = new List<Task>();
+
+                for (var i = 0; i < count; i++)
+                {
+                    tasks.Add(Task.Run(async () => await client.Invoke<int>(nameof(TestHub.ExpectedResult), i)));
+                }
+
+                await Task.WhenAll(tasks);
+            }
+        }
+
+        [Theory]
+        [InlineData(1)]
+        [InlineData(2)]
+        [InlineData(4)]
+        [InlineData(8)]
+        [InlineData(16)]
+        [InlineData(32)]
+        [InlineData(64)]
+        public async Task ParallelCallsToHubMethodsAfterReconnectForResultDoesntDie(int count)
+        {
+            using (new SimpleMorseLServer<TestHub>(IPAddress.Any, 5000, (s, b) =>
+            {
+                s.Configure<Extensions.MorseLOptions>(o => o.ThrowOnInvalidMessage = false);
+            }).Start())
+            {
+                var client = new Connection("ws://localhost:5000/hub", options: o =>
+                {
+                    o.ThrowOnInvalidMessage = true;
+                    o.RethrowUnobservedExceptions = true;
+                    o.ThrowOnMissingHubMethodInvoked = true;
+                    o.ThrowOnMissingMethodRequest = true;
+                });
+                await client.StartAsync();
+
+                var client2 = new Connection("ws://localhost:5000/hub", options: o =>
+                {
+                    o.ThrowOnInvalidMessage = true;
+                    o.RethrowUnobservedExceptions = true;
+                    o.ThrowOnMissingHubMethodInvoked = true;
+                    o.ThrowOnMissingMethodRequest = true;
+                });
+                await client2.StartAsync();
+
+                var tasks = new List<Task>();
+
+                for (var i = 0; i < count; i++)
+                {
+                    var taskId = 10000 + i;
+                    tasks.Add(client2.Invoke<int>(nameof(TestHub.ExpectedResult), taskId).ContinueWith(t =>
+                    {
+                        _testOutputHelper.WriteLine($"Completing task {t.Result}");
+                    }));
+
+                    taskId = i;
+                    tasks.Add(client.Invoke<int>(nameof(TestHub.ExpectedResult), taskId).ContinueWith(t =>
+                    {
+                        _testOutputHelper.WriteLine($"Completing task {t.Result}");
+                    }));
+                }
+
+                await Task.WhenAll(tasks);
             }
         }
 
