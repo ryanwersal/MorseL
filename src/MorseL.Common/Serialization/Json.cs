@@ -88,6 +88,7 @@ namespace MorseL.Common.Serialization
 
             var id = json.Value<string>("Id");
             var returnType = handlers[id].ResultType;
+            if (!handlers.ContainsKey(id)) throw new InvalidInvocationResultException(jsonString, id);
             var invocationResultDescriptor = new InvocationResultDescriptor
             {
                 Id = id,
