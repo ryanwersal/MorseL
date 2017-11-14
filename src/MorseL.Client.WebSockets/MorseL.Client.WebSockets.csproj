@@ -8,7 +8,9 @@
 
   <ItemGroup>
     <PackageReference Include="Nito.AsyncEx" Version="5.0.0-pre-02" />
-    <PackageReference Include="WebSocket4Net" Version="0.15.0-beta7" />
+    <PackageReference Include="WebSocket4Net">
+      <Version>0.15.0.9-preview1-20171114</Version>
+    </PackageReference>
   </ItemGroup>
 
 </Project>

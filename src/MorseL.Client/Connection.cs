@@ -129,7 +129,17 @@ namespace MorseL.Client
                             break;
 
                         case MessageType.InvocationResult:
-                            var resultDescriptor = Json.DeserializeInvocationResultDescriptor(message.Data, _pendingCalls);
+                            InvocationResultDescriptor resultDescriptor;
+                            try
+                            {
+                                resultDescriptor = Json.DeserializeInvocationResultDescriptor(message.Data, _pendingCalls);
+                            }
+                            catch (Exception exception)
+                            {
+                                await HandleInvalidInvocationResultDescriptor(message.Data, exception);
+                                return;
+                            }
+
                             HandleInvokeResult(resultDescriptor);
                             break;
                         case MessageType.Error:
@@ -216,6 +226,20 @@ namespace MorseL.Client
             // TODO : Move to a Error type that can be handled specifically
             // Since we don't have an invocation descriptor we can't return an invocation result
             return SendMessageAsync($"Error: Invalid message \"{serializedInvocationDescriptor}\"");
+        }
+
+        private Task HandleInvalidInvocationResultDescriptor(string serializedResultDescriptor, Exception exception = null)
+        {
+            if (_options.ThrowOnInvalidMessage)
+            {
+                throw new MorseLException($"Invalid result descriptor received \"{serializedResultDescriptor}\"", exception);
+            }
+
+            _logger?.LogError(new EventId(), exception, $"Invalid result descriptor \"{serializedResultDescriptor}\"");
+
+            // TODO : Move to a Error type that can be handled specifically
+            // Since we don't have an invocation descriptor we can't return an invocation result
+            return SendMessageAsync($"Error: Invalid result descriptor \"{serializedResultDescriptor}\"");
         }
 
         private Task HandleErrorMessage(Message message)
