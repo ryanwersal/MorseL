@@ -17,6 +17,7 @@ using MorseL.Extensions;
 using MorseL.Shared.Tests;
 using MorseL.Sockets.Middleware;
 using Xunit.Abstractions;
+using IMiddleware = MorseL.Client.Middleware.IMiddleware;
 
 namespace MorseL.Tests
 {
@@ -36,7 +37,7 @@ namespace MorseL.Tests
             using (new SimpleMorseLServer<TestHub>(IPAddress.Any, 5000).Start())
             {
                 var connectedCalled = false;
-                var client = new Client.Connection("ws://localhost:5000/hub");
+                var client = new Connection("ws://localhost:5000/hub");
                 client.Connected += () => connectedCalled = true;
                 await client.StartAsync();
                 Assert.True(connectedCalled);
@@ -53,7 +54,7 @@ namespace MorseL.Tests
                 var connectedCalled = false;
                 for (int i = 0; i < 10; i++)
                 {
-                    var client = new Client.Connection("ws://localhost:5000/hub");
+                    var client = new Connection("ws://localhost:5000/hub");
                     client.Connected += () => connectedCalled = true;
                     await client.StartAsync();
                     var task = client.Invoke<object>("FooBar");
@@ -282,8 +283,6 @@ namespace MorseL.Tests
                 await client.DisposeAsync();
 
                 await Assert.ThrowsAnyAsync<WebSocketClosedException>(() => task);
-
-                await client.DisposeAsync();
             }
         }
 
@@ -652,7 +651,7 @@ namespace MorseL.Tests
             }
         }
 
-        public class Base64ClientMiddleware : Client.Middleware.IMiddleware
+        public class Base64ClientMiddleware : IMiddleware
         {
             public async Task SendAsync(string data, TransmitDelegate next)
             {

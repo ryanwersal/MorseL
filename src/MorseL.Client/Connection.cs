@@ -45,9 +45,11 @@ namespace MorseL.Client
     {
         public string ConnectionId { get; set; }
 
-        private WebSocketClient _clientWebSocket { get; }
-        private string Name { get; }
+        private readonly WebSocketClient _clientWebSocket;
+        private readonly string _name;
         private readonly ILogger _logger;
+        private bool _hasStarted;
+        private bool _isDisposed;
 
         private readonly MorseLOptions _options = new MorseLOptions();
 
@@ -66,11 +68,13 @@ namespace MorseL.Client
         public event Action<Exception> Closed;
         public event Action<Exception> Error;
 
-        private IList<Exception> _pendingExceptions = new List<Exception>();
+        private readonly IList<Exception> _pendingExceptions = new List<Exception>();
+
+        public bool IsConnected => _clientWebSocket.State == WebSocketState.Open;
 
         public Connection(string uri, string name = null, Action<MorseLOptions> options = null, Action<WebSocketClientOption> config = null, Action<SecurityOption> securityConfig = null, ILogger logger = null)
         {
-            Name = name;
+            _name = name;
             _logger = logger;
             options?.Invoke(_options);
             _clientWebSocket = new WebSocketClient(uri, config, securityConfig);
@@ -94,6 +98,9 @@ namespace MorseL.Client
 
         public async Task StartAsync(CancellationToken ct = default(CancellationToken))
         {
+            if (_hasStarted) throw new MorseLException("Cannot call StartAsync more than once.");
+            _hasStarted = true;
+
             await Task.Run(async () =>
             {
                 await _clientWebSocket.ConnectAsync(ct).ConfigureAwait(false);
@@ -272,6 +279,8 @@ namespace MorseL.Client
         public Task<object> Invoke(string methodName, Type returnType, params object[] args) => Invoke(methodName, returnType, CancellationToken.None, args);
         public async Task<object> Invoke(string methodName, Type returnType, CancellationToken cancellationToken, params object[] args)
         {
+            if (!IsConnected) throw new MorseLException("Cannot call Invoke when not connected.");
+
             if (_options.RethrowUnobservedExceptions && _pendingExceptions?.Count > 0)
             {
                 throw new AggregateException("Unobserved exceptions thrown during receive loop", _pendingExceptions);
@@ -414,6 +423,9 @@ namespace MorseL.Client
 
         public async Task DisposeAsync(CancellationToken ct = default(CancellationToken))
         {
+            if (_isDisposed) throw new MorseLException("This connection has already been disposed.");
+            _isDisposed = true;
+
             if (_clientWebSocket.State != WebSocketState.Closed)
             {
                 await _clientWebSocket.CloseAsync(ct).ConfigureAwait(false);
