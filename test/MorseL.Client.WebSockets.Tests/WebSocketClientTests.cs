@@ -71,5 +71,12 @@ namespace MorseL.Client.WebSockets.Tests
 
             return Task.CompletedTask;
         }
+
+        [Fact]
+        public async Task ConnectingToInvalidHostThrowsException()
+        {
+            var client = new WebSocketClient("ws://asdfasdfasdf:5000");
+            await Assert.ThrowsAsync<SocketException>(() => client.ConnectAsync());
+        }
     }
 }

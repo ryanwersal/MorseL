@@ -6,6 +6,11 @@
     <VersionPrefix>$(VersionPrefix)</VersionPrefix>
   </PropertyGroup>
 
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|AnyCPU'">
+    <DebugType>full</DebugType>
+    <DebugSymbols>true</DebugSymbols>
+  </PropertyGroup>
+
   <ItemGroup>
     <PackageReference Include="Nito.AsyncEx" Version="5.0.0-pre-02" />
     <PackageReference Include="WebSocket4Net">
