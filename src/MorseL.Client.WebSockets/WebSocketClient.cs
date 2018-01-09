@@ -142,9 +142,10 @@ namespace MorseL.Client.WebSockets
             // We don't link to the internal cancel token here as we wouldn't want to stop ourselves...
             var task = Task.Run(async () =>
             {
-                if (_internalWebSocket.State != WebSocketState.Open)
+                var state = _internalWebSocket.State;
+                if (state != WebSocketState.Open && state != WebSocketState.Connecting)
                 {
-                    throw new WebSocketClientException("The socket isn't open.");
+                    throw new WebSocketClientException("The socket isn't open or connecting.");
                 }
 
                 // Cancel any internal operations

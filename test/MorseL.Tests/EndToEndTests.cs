@@ -282,7 +282,7 @@ namespace MorseL.Tests
                 // Disconnect the client
                 await client.DisposeAsync();
 
-                await Assert.ThrowsAnyAsync<WebSocketClosedException>(() => task);
+                await Assert.ThrowsAnyAsync<MorseLException>(() => task);
             }
         }
 
