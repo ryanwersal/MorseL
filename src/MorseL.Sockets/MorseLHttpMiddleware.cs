@@ -95,7 +95,7 @@ namespace MorseL.Sockets
                     await Receive(socket, connection, middleware, cts,
                         async (result, serializedInvocationDescriptor) =>
                         {
-                            if (result.MessageType == WebSocketMessageType.Text)
+                            if (result.MessageType == WebSocketMessageType.Text || result.MessageType == WebSocketMessageType.Binary)
                             {
                                 // We call the connection arg'd method directly to allow for middleware to override the IChannel
                                 var unawaitedTask = Task.Run(async () =>
