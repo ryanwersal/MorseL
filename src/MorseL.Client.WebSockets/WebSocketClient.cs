@@ -8,7 +8,9 @@ using System.Threading;
 using System.Threading.Tasks;
 using Nito.AsyncEx;
 using SuperSocket.ClientEngine;
+using SuperSocket.ClientEngine.Proxy;
 using WebSocket4Net;
+
 
 namespace MorseL.Client.WebSockets
 {
@@ -47,6 +49,8 @@ namespace MorseL.Client.WebSockets
                 Options.ReceiveBufferSize);
             Security = _internalWebSocket.Security;
             securityConfig?.Invoke(Security);
+
+            _internalWebSocket.Proxy = Options.Proxy;
             _internalWebSocket.EnableAutoSendPing = Options.EnableAutoSendPing;
             _internalWebSocket.AutoSendPingInterval = Options.AutoSendPingIntervalSeconds;
 
@@ -138,9 +142,10 @@ namespace MorseL.Client.WebSockets
             // We don't link to the internal cancel token here as we wouldn't want to stop ourselves...
             var task = Task.Run(async () =>
             {
-                if (_internalWebSocket.State != WebSocketState.Open)
+                var state = _internalWebSocket.State;
+                if (state != WebSocketState.Open && state != WebSocketState.Connecting)
                 {
-                    throw new WebSocketClientException("The socket isn't open.");
+                    throw new WebSocketClientException("The socket isn't open or connecting.");
                 }
 
                 // Cancel any internal operations
@@ -303,6 +308,7 @@ namespace MorseL.Client.WebSockets
         public int ReceiveBufferSize { get; set; } = 0;
         public bool EnableAutoSendPing { get; set; } = false;
         public int AutoSendPingIntervalSeconds { get; set; } = 120;
+        public IProxyConnector Proxy { get; set; } = null;
     }
 
     public class WebSocketClientException : Exception

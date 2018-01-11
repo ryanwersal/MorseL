@@ -1,8 +1,10 @@
 ﻿using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
 using System.Security.Claims;
+using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.Extensions.DependencyInjection;
@@ -29,6 +31,9 @@ namespace MorseL
 
     public class HubWebSocketHandler<THub, TClient> : WebSocketHandler where THub : Hub<TClient>
     {
+        // Used to track the last 100 requests to ignore duplicates
+        private readonly LruCache<int, bool> _requests = new LruCache<int, bool>(100);
+
         private readonly Dictionary<string, HubMethodDescriptor> _methods = new Dictionary<string, HubMethodDescriptor>(StringComparer.OrdinalIgnoreCase);
 
         private readonly IServiceProvider _services;
@@ -186,7 +191,16 @@ namespace MorseL
                 // Really strange and unlikely, valid JSON and was known but not found here
                 // Likely not possible
                 await HandleMissingReceivedInvocationDescriptor(connection, invocationDescriptor);
+                return;
             }
+
+            if (!int.TryParse(invocationDescriptor.Id, out var requestId) || _requests.ContainsKey(requestId))
+            {
+                _logger.LogWarning("Message received with stale request ID {RequestId}", requestId);
+                return;
+            }
+
+            _requests.Add(requestId, true);
 
             var result = await Invoke(descriptor, connection, invocationDescriptor);
 
@@ -312,6 +326,8 @@ namespace MorseL
 
         private async Task<InvocationResultDescriptor> Invoke(HubMethodDescriptor descriptor, Connection connection, InvocationDescriptor invocationDescriptor)
         {
+            _logger.LogDebug("Invoking request {RequestId} for {HubMethod} with {Arguments}", invocationDescriptor.Id, invocationDescriptor.MethodName, invocationDescriptor.Arguments);
+
             var invocationResult = new InvocationResultDescriptor
             {
                 Id = invocationDescriptor.Id
