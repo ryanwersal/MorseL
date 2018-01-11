@@ -45,9 +45,11 @@ namespace MorseL.Client
     {
         public string ConnectionId { get; set; }
 
-        private WebSocketClient _clientWebSocket { get; }
-        private string Name { get; }
+        private readonly WebSocketClient _clientWebSocket;
+        private readonly string _name;
         private readonly ILogger _logger;
+        private bool _hasStarted;
+        private bool _isDisposed;
 
         private readonly MorseLOptions _options = new MorseLOptions();
 
@@ -66,11 +68,13 @@ namespace MorseL.Client
         public event Action<Exception> Closed;
         public event Action<Exception> Error;
 
-        private IList<Exception> _pendingExceptions = new List<Exception>();
+        private readonly IList<Exception> _pendingExceptions = new List<Exception>();
+
+        public bool IsConnected => _clientWebSocket.State == WebSocketState.Open;
 
         public Connection(string uri, string name = null, Action<MorseLOptions> options = null, Action<WebSocketClientOption> config = null, Action<SecurityOption> securityConfig = null, ILogger logger = null)
         {
-            Name = name;
+            _name = name;
             _logger = logger;
             options?.Invoke(_options);
             _clientWebSocket = new WebSocketClient(uri, config, securityConfig);
@@ -94,6 +98,9 @@ namespace MorseL.Client
 
         public async Task StartAsync(CancellationToken ct = default(CancellationToken))
         {
+            if (_hasStarted) throw new MorseLException("Cannot call StartAsync more than once.");
+            _hasStarted = true;
+
             await Task.Run(async () =>
             {
                 await _clientWebSocket.ConnectAsync(ct).ConfigureAwait(false);
@@ -129,7 +136,17 @@ namespace MorseL.Client
                             break;
 
                         case MessageType.InvocationResult:
-                            var resultDescriptor = Json.DeserializeInvocationResultDescriptor(message.Data, _pendingCalls);
+                            InvocationResultDescriptor resultDescriptor;
+                            try
+                            {
+                                resultDescriptor = Json.DeserializeInvocationResultDescriptor(message.Data, _pendingCalls);
+                            }
+                            catch (Exception exception)
+                            {
+                                await HandleInvalidInvocationResultDescriptor(message.Data, exception);
+                                return;
+                            }
+
                             HandleInvokeResult(resultDescriptor);
                             break;
                         case MessageType.Error:
@@ -218,6 +235,20 @@ namespace MorseL.Client
             return SendMessageAsync($"Error: Invalid message \"{serializedInvocationDescriptor}\"");
         }
 
+        private Task HandleInvalidInvocationResultDescriptor(string serializedResultDescriptor, Exception exception = null)
+        {
+            if (_options.ThrowOnInvalidMessage)
+            {
+                throw new MorseLException($"Invalid result descriptor received \"{serializedResultDescriptor}\"", exception);
+            }
+
+            _logger?.LogError(new EventId(), exception, $"Invalid result descriptor \"{serializedResultDescriptor}\"");
+
+            // TODO : Move to a Error type that can be handled specifically
+            // Since we don't have an invocation descriptor we can't return an invocation result
+            return SendMessageAsync($"Error: Invalid result descriptor \"{serializedResultDescriptor}\"");
+        }
+
         private Task HandleErrorMessage(Message message)
         {
             // We must have sent some bad JSON?
@@ -248,6 +279,8 @@ namespace MorseL.Client
         public Task<object> Invoke(string methodName, Type returnType, params object[] args) => Invoke(methodName, returnType, CancellationToken.None, args);
         public async Task<object> Invoke(string methodName, Type returnType, CancellationToken cancellationToken, params object[] args)
         {
+            if (!IsConnected) throw new MorseLException("Cannot call Invoke when not connected.");
+
             if (_options.RethrowUnobservedExceptions && _pendingExceptions?.Count > 0)
             {
                 throw new AggregateException("Unobserved exceptions thrown during receive loop", _pendingExceptions);
@@ -390,6 +423,9 @@ namespace MorseL.Client
 
         public async Task DisposeAsync(CancellationToken ct = default(CancellationToken))
         {
+            if (_isDisposed) throw new MorseLException("This connection has already been disposed.");
+            _isDisposed = true;
+
             if (_clientWebSocket.State != WebSocketState.Closed)
             {
                 await _clientWebSocket.CloseAsync(ct).ConfigureAwait(false);
@@ -405,6 +441,8 @@ namespace MorseL.Client
 
         private async Task Receive(Func<Message, Task> handleMessage, CancellationToken ct)
         {
+            Exception closingException = null;
+
             while (!ct.IsCancellationRequested && _clientWebSocket.State == WebSocketState.Open)
             {
                 try
@@ -444,22 +482,9 @@ namespace MorseL.Client
                 }
                 catch (WebSocketClosedException e)
                 {
-                    // We're closing so we need to unblock any pending TaskCompletionSources
-                    InvocationRequest[] calls;
-
-                    lock (_pendingCallsLock)
-                    {
-                        calls = _pendingCalls.Values.ToArray();
-                        _pendingCalls.Clear();
-                    }
-
-                    foreach (var request in calls)
-                    {
-                        request.Registration.Dispose();
-                        request.Completion.TrySetException(e);
-                    }
-
                     // Eat the exception because we're closing
+                    closingException = e;
+
                     // But we cancel out because the socket is closed
                     break;
                 }
@@ -467,6 +492,21 @@ namespace MorseL.Client
                 {
                     Error?.Invoke(e);
                 }
+            }
+
+            // We're closing so we need to unblock any pending TaskCompletionSources
+            InvocationRequest[] calls;
+
+            lock (_pendingCallsLock)
+            {
+                calls = _pendingCalls.Values.ToArray();
+                _pendingCalls.Clear();
+            }
+
+            foreach (var request in calls)
+            {
+                request.Registration.Dispose();
+                request.Completion.TrySetException(closingException ?? new WebSocketClosedException("The websocket has been closed!"));
             }
         }
 

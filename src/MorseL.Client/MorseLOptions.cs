@@ -23,7 +23,7 @@ namespace MorseL.Client
         /// </para>
         /// Defaults to false
         /// </summary>
-        public bool ThrowOnMissingHubMethodInvoked { get; set; } = true;
+        public bool ThrowOnMissingHubMethodInvoked { get; set; } = false;
 
         /// <summary>
         /// <para>
