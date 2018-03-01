@@ -52,50 +52,58 @@ namespace MorseL.Common.Serialization
         public static InvocationDescriptor DeserializeInvocationDescriptor(
             string jsonString, MethodInfo[] handlerMethods)
         {
-            var stringReader = new StringReader(jsonString);
-            var json = _serializer.Deserialize<JObject>(new JsonTextReader(stringReader));
-            if (json == null) return null;
-
-            var invocationDescriptor = new InvocationDescriptor
+            using (var stringReader = new StringReader(jsonString))
             {
-                Id = json.Value<string>("Id"),
-                MethodName = json.Value<string>("MethodName")
-            };
+                using (var textReader = new JsonTextReader(stringReader)) {
+                    var json = _serializer.Deserialize<JObject>(textReader);
+                    if (json == null) return null;
 
-            var method = handlerMethods.FirstOrDefault(m => m.Name == invocationDescriptor.MethodName);
-            if (method == null) return null;
+                    var invocationDescriptor = new InvocationDescriptor
+                    {
+                        Id = json.Value<string>("Id"),
+                        MethodName = json.Value<string>("MethodName")
+                    };
 
-            var argTypes = method.GetParameters().Select(p => p.ParameterType).ToArray();
-            invocationDescriptor.Arguments = new object[argTypes.Length];
+                    var method = handlerMethods.FirstOrDefault(m => m.Name == invocationDescriptor.MethodName);
+                    if (method == null) return null;
 
-            var args = json.Value<JArray>("Arguments");
-            for (var i = 0; i < argTypes.Length; ++i)
-            {
-                var argType = argTypes[i];
-                invocationDescriptor.Arguments[i] = args[i].ToObject(argType, _serializer);
+                    var argTypes = method.GetParameters().Select(p => p.ParameterType).ToArray();
+                    invocationDescriptor.Arguments = new object[argTypes.Length];
+
+                    var args = json.Value<JArray>("Arguments");
+                    for (var i = 0; i < argTypes.Length; ++i)
+                    {
+                        var argType = argTypes[i];
+                        invocationDescriptor.Arguments[i] = args[i].ToObject(argType, _serializer);
+                    }
+
+                    return invocationDescriptor;
+                }
             }
-
-            return invocationDescriptor;
         }
 
         public static InvocationResultDescriptor DeserializeInvocationResultDescriptor(
             string jsonString, Dictionary<string, InvocationRequest> handlers)
         {
-            var stringReader = new StringReader(jsonString);
-            var json = _serializer.Deserialize<JObject>(new JsonTextReader(stringReader));
-            if (json == null) return null;
-
-
-            var id = json.Value<string>("Id");
-            var returnType = handlers[id].ResultType;
-            if (!handlers.ContainsKey(id)) throw new InvalidInvocationResultException(jsonString, id);
-            var invocationResultDescriptor = new InvocationResultDescriptor
+            using (var stringReader = new StringReader(jsonString))
             {
-                Id = id,
-                Result = returnType == null ? null : json["Result"].ToObject(returnType, _serializer),
-                Error = json.Value<string>("Error")
-            };
-            return invocationResultDescriptor;
+                using (var textReader = new JsonTextReader(stringReader)) {
+                    var json = _serializer.Deserialize<JObject>(textReader);
+                    if (json == null) return null;
+
+
+                    var id = json.Value<string>("Id");
+                    var returnType = handlers[id].ResultType;
+                    if (!handlers.ContainsKey(id)) throw new InvalidInvocationResultException(jsonString, id);
+                    var invocationResultDescriptor = new InvocationResultDescriptor
+                    {
+                        Id = id,
+                        Result = returnType == null ? null : json["Result"].ToObject(returnType, _serializer),
+                        Error = json.Value<string>("Error")
+                    };
+                    return invocationResultDescriptor;
+                }
+            }
         }
 
         public static string SerializeObject<T>(T obj)
