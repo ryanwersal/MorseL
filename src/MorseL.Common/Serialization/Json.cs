@@ -21,32 +21,37 @@ namespace MorseL.Common.Serialization
         public static InvocationDescriptor DeserializeInvocationDescriptor(
             string jsonString, ConcurrentDictionary<string, InvocationHandler> handlers)
         {
-            var stringReader = new StringReader(jsonString);
-            var json = _serializer.Deserialize<JObject>(new JsonTextReader(stringReader));
-            if (json == null) return null;
-
-            var invocationDescriptor = new InvocationDescriptor
+            using (var stringReader = new StringReader(jsonString))
             {
-                Id = json.Value<string>("Id"),
-                MethodName = json.Value<string>("MethodName")
-            };
+                using (var textReader = new JsonTextReader(stringReader))
+                {
+                    var json = _serializer.Deserialize<JObject>(textReader);
+                    if (json == null) return null;
 
-            if (!handlers.ContainsKey(invocationDescriptor.MethodName))
-            {
-                return null;
+                    var invocationDescriptor = new InvocationDescriptor
+                    {
+                        Id = json.Value<string>("Id"),
+                        MethodName = json.Value<string>("MethodName")
+                    };
+
+                    if (!handlers.ContainsKey(invocationDescriptor.MethodName))
+                    {
+                        return null;
+                    }
+
+                    var argTypes = handlers[invocationDescriptor.MethodName].ParameterTypes;
+                    invocationDescriptor.Arguments = new object[argTypes.Length];
+
+                    var args = json.Value<JArray>("Arguments");
+                    for (var i = 0; i < argTypes.Length; ++i)
+                    {
+                        var argType = argTypes[i];
+                        invocationDescriptor.Arguments[i] = args[i].ToObject(argType, _serializer);
+                    }
+
+                    return invocationDescriptor;
+                }
             }
-
-            var argTypes = handlers[invocationDescriptor.MethodName].ParameterTypes;
-            invocationDescriptor.Arguments = new object[argTypes.Length];
-
-            var args = json.Value<JArray>("Arguments");
-            for (var i = 0; i < argTypes.Length; ++i)
-            {
-                var argType = argTypes[i];
-                invocationDescriptor.Arguments[i] = args[i].ToObject(argType, _serializer);
-            }
-
-            return invocationDescriptor;
         }
 
         public static InvocationDescriptor DeserializeInvocationDescriptor(
