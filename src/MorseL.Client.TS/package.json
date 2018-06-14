@@ -1,12 +1,12 @@
 {
-  "name": "websocket-manager-typescript-client",
-  "version": "0.1.0",
+  "name": "morsel-client",
+  "version": "2.0.3",
   "description": "",
-  "main": "dist/MorseL.min.js",
+  "main": "dist/MorseL.js",
   "scripts": {
     "prepublish": "webpack --debug; webpack"
   },
-  "author": "Radu Matei <matei.radu94@gmail.com>",
+  "author": "Austin Hanson <berdon@gmail.com>",
   "license": "MIT",
   "devDependencies": {
     "mocha": "^2.4.5",
