@@ -7,6 +7,7 @@ var Connection = (function () {
         if (enableLogging === void 0) { enableLogging = false; }
         var _this = this;
         this.enableLogging = false;
+        this.middlewares = [];
         this.clientMethods = {};
         this.connectionMethods = {};
         this.url = url;
@@ -39,23 +40,23 @@ var Connection = (function () {
         this.socket.onmessage = function (event) {
             var index = 0;
             var delegate = function (transformedData) {
-                if (index < this.middlewares.length) {
-                    this.middlewares[index++].receive(transformedData, delegate);
+                if (index < _this.middlewares.length) {
+                    _this.middlewares[index++].receive(transformedData, delegate);
                 }
                 else {
-                    this.message = JSON.parse(transformedData);
-                    if (this.message.MessageType == Message_1.MessageType.Text) {
-                        if (this.enableLogging) {
-                            console.log('Text message received. Message: ' + this.message.Data);
+                    _this.message = JSON.parse(transformedData);
+                    if (_this.message.MessageType == Message_1.MessageType.Text) {
+                        if (_this.enableLogging) {
+                            console.log('Text message received. Message: ' + _this.message.Data);
                         }
                     }
-                    else if (this.message.MessageType == Message_1.MessageType.MethodInvocation) {
-                        var invocationDescriptor = JSON.parse(this.message.Data);
-                        this.clientMethods[invocationDescriptor.MethodName].apply(this, invocationDescriptor.Arguments);
+                    else if (_this.message.MessageType == Message_1.MessageType.MethodInvocation) {
+                        var invocationDescriptor = JSON.parse(_this.message.Data);
+                        _this.clientMethods[invocationDescriptor.MethodName].apply(_this, invocationDescriptor.Arguments);
                     }
-                    else if (this.message.MessageType == Message_1.MessageType.ConnectionEvent) {
-                        this.connectionId = this.message.Data;
-                        this.connectionMethods['onConnected'].apply(this);
+                    else if (_this.message.MessageType == Message_1.MessageType.ConnectionEvent) {
+                        _this.connectionId = _this.message.Data;
+                        _this.connectionMethods['onConnected'].apply(_this);
                     }
                 }
             };
@@ -71,6 +72,7 @@ var Connection = (function () {
         };
     };
     Connection.prototype.invoke = function (methodName) {
+        var _this = this;
         var args = [];
         for (var _i = 1; _i < arguments.length; _i++) {
             args[_i - 1] = arguments[_i];
@@ -81,11 +83,11 @@ var Connection = (function () {
         }
         var index = 0;
         var delegate = function (transformedData) {
-            if (index < this.middlewares.length) {
-                this.middlewares[index++].send(transformedData, delegate);
+            if (index < _this.middlewares.length) {
+                _this.middlewares[index++].send(transformedData, delegate);
             }
             else {
-                this.socket.send(transformedData);
+                _this.socket.send(transformedData);
             }
         };
         delegate(JSON.stringify(invocationDescriptor));
