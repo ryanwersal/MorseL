@@ -2,7 +2,7 @@
   <Import Project="../../version.props" />
 
   <PropertyGroup>
-    <TargetFramework>netstandard1.6</TargetFramework>
+    <TargetFramework>netstandard2.0</TargetFramework>
     <VersionPrefix>$(VersionPrefix)</VersionPrefix>
   </PropertyGroup>
 
@@ -14,7 +14,7 @@
   <ItemGroup>
     <PackageReference Include="Nito.AsyncEx" Version="5.0.0-pre-02" />
     <PackageReference Include="WebSocket4Net">
-      <Version>0.15.1</Version>
+      <Version>0.15.2</Version>
     </PackageReference>
   </ItemGroup>
 
