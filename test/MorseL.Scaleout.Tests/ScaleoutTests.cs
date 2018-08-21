@@ -37,6 +37,22 @@ namespace MorseL.Scaleout.Tests
         }
 
         [Fact]
+        public async void ClientConnectAndDisconnectCleansUpBackplaneEventHandlers()
+        {
+            var backplane = new DefaultBackplane();
+            var serviceProvider = CreateServiceProvider(o => {
+                o.AddSingleton<IBackplane>(backplane);
+            });
+            var actualHub = serviceProvider.GetRequiredService<HubWebSocketHandler<TestHub>>();
+            var webSocket = new LinkedFakeSocket();
+
+            var connection = await CreateHubConnectionFromSocket(actualHub, webSocket);
+            await actualHub.OnDisconnected(webSocket, null);
+
+            Assert.Equal(0, backplane.OnMessageCount);
+        }
+
+        [Fact]
         public async void ClientDisconnectCallsBackplaneOnClientDisconnected()
         {
             var backplane = new TestBackplane() {

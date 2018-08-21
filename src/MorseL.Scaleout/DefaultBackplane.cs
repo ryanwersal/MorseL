@@ -11,19 +11,33 @@ namespace MorseL.Scaleout
 {
     public class DefaultBackplane : IBackplane
     {
-        private readonly IDictionary<string, object> _connections = new ConcurrentDictionary<string, object>();
+        private readonly IDictionary<string, OnMessageDelegate> _connections = new ConcurrentDictionary<string, OnMessageDelegate>();
         private readonly IDictionary<string, IDictionary<string, object>> _groups = new ConcurrentDictionary<string, IDictionary<string, object>>();
         private readonly IDictionary<string, IDictionary<string, object>> _subscriptions = new ConcurrentDictionary<string, IDictionary<string, object>>();
-        public event OnMessageDelegate OnMessage;
 
-        public Task OnClientConnectedAsync(string connectionId)
+        internal int OnMessageCount => _onMessage?.GetInvocationList().Count() ?? 0;
+        private OnMessageDelegate _onMessage;
+
+        public Task OnClientConnectedAsync(string connectionId, OnMessageDelegate onMessageDelegate)
         {
-            _connections.Add(connectionId, null);
+            _connections.Add(connectionId, onMessageDelegate);
+
+            if (onMessageDelegate != null)
+            {
+                _onMessage += onMessageDelegate;
+            }
+
             return Task.CompletedTask;
         }
 
         public async Task OnClientDisconnectedAsync(string connectionId)
         {
+            // Deregister the message delegate
+            if (_connections.TryGetValue(connectionId, out OnMessageDelegate onMessageDelegate) && onMessageDelegate != null)
+            {
+                _onMessage -= onMessageDelegate;
+            }
+
             _connections.Remove(connectionId);
 
             // Unsubscribe from groups
@@ -118,8 +132,8 @@ namespace MorseL.Scaleout
         }
 
         private async Task InvokeOnMessage(string connectionId, Message message) {
-            if (OnMessage != null) {
-                await OnMessage(connectionId, message)
+            if (_onMessage != null) {
+                await _onMessage(connectionId, message)
                     .ConfigureAwait(false);
             }
         }

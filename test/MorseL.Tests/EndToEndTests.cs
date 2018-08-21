@@ -18,6 +18,8 @@ using MorseL.Shared.Tests;
 using MorseL.Sockets.Middleware;
 using Xunit.Abstractions;
 using IMiddleware = MorseL.Client.Middleware.IMiddleware;
+using MorseL.Sockets;
+using Connection = MorseL.Client.Connection;
 
 namespace MorseL.Tests
 {
@@ -582,6 +584,19 @@ namespace MorseL.Tests
                 }
 
                 await Task.WhenAll(tasks);
+            }
+        }
+
+        public class ConnectionBrokenTestHub : Hub
+        {
+            public override Task OnConnectedAsync(Sockets.Connection connection)
+            {
+                throw new Exception();
+            }
+
+            public override Task OnDisconnectedAsync(Exception exception)
+            {
+                return base.OnDisconnectedAsync(exception);
             }
         }
 

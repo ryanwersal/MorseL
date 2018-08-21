@@ -99,13 +99,12 @@ namespace MorseL.Scaleout.Tests
 
     public class TestBackplane : IBackplane
     {
-        public event OnMessageDelegate OnMessage;
         public Func<string, Task> OnClientConnectedCallback { get; set; } =
             (id) => throw new NotImplementedException(nameof(OnClientConnectedAsync));
         public Func<string, Task> OnClientDisconnectedCallback { get; set; } =
             (id) => throw new NotImplementedException(nameof(OnClientDisconnectedAsync));
 
-        public Task OnClientConnectedAsync(string connectionId)
+        public Task OnClientConnectedAsync(string connectionId, OnMessageDelegate onMessageDelegate)
         {
             return OnClientConnectedCallback(connectionId);
         }

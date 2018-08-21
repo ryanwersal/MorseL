@@ -46,6 +46,30 @@ namespace MorseL.Scaleout.Redis.Tests
         }
 
         [Fact]
+        public async void ClientConnectAndDisconnectCleansUpBackplaneEventHandlers()
+        {
+            var serviceProvider = CreateServiceProvider(o => {
+                o.AddSingleton<IBackplane, RedisBackplane>();
+                o.Configure<ConfigurationOptions>(options =>
+                {
+                    options.EndPoints.Add("localhost:6379");
+                });
+            });
+
+            var backplane = (RedisBackplane)serviceProvider.GetRequiredService<IBackplane>();
+            var actualHub = serviceProvider.GetRequiredService<HubWebSocketHandler<TestHub>>();
+            var webSocket = new LinkedFakeSocket();
+
+            var connection = await CreateHubConnectionFromSocket(actualHub, webSocket);
+
+            Assert.Contains(connection.Id, backplane.Connections.Keys);
+
+            await actualHub.OnDisconnected(webSocket, null);
+
+            Assert.Equal(0, backplane.OnMessageCount);
+        }
+
+        [Fact]
         public async void ConnectionSubscriptionRemovedOnNormalDisconnect()
         {
             var serviceProvider = CreateServiceProvider(o => {

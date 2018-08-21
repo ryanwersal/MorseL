@@ -44,6 +44,11 @@ namespace MorseL.Sockets
             return connection;
         }
 
+        public bool HasConnection(string id)
+        {
+            return _connections.ContainsKey(id);
+        }
+
         public async Task RemoveConnection(string id)
         {
             _connections.TryRemove(id, out Connection connection);

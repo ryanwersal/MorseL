@@ -15,6 +15,8 @@ namespace MorseL.Shared.Tests
         private static Action<IServiceCollection, IMorseLBuilder> _serviceConfigurator;
         private static Action<IApplicationBuilder, IServiceProvider> _applicationCongurator;
 
+        public IServiceProvider Services => _webHost.Services;
+
         public SimpleMorseLServer(IPAddress address, int port, Action<IServiceCollection, IMorseLBuilder> services = null, Action<IApplicationBuilder, IServiceProvider> configure = null, IMiddleware[] middleware = null)
         {
             _serviceConfigurator = services;
