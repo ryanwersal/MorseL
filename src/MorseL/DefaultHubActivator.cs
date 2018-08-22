@@ -12,6 +12,7 @@ namespace MorseL
     {
         private readonly IServiceProvider _serviceProvider;
         private bool? _created;
+        internal bool _disposed;
 
         public DefaultHubActivator(IServiceProvider serviceProvider)
         {
@@ -42,6 +43,7 @@ namespace MorseL
 
             Debug.Assert(_created.HasValue, "hubs must be released with the hub activator they were created");
 
+            _disposed = true;
             if (_created.Value)
             {
                 hub.Dispose();
