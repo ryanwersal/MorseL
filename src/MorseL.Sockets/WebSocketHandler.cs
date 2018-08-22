@@ -73,22 +73,25 @@ namespace MorseL.Sockets
         {
             var connection = WebSocketConnectionManager.GetConnection(socket);
 
-            try
+            if (connection != null)
             {
-                await WebSocketConnectionManager.RemoveConnection(connection.Id).ConfigureAwait(false);
-            }
-            catch (Exception removeException)
-            {
-                // Likely the same reason why we disconnected
-                if (!removeException.Equals(exception))
+                try
                 {
-                    _logger.LogError(removeException.Message);
+                    await WebSocketConnectionManager.RemoveConnection(connection.Id).ConfigureAwait(false);
                 }
+                catch (Exception removeException)
+                {
+                    // Likely the same reason why we disconnected
+                    if (!removeException.Equals(exception))
+                    {
+                        _logger.LogError(removeException.Message);
+                    }
+                }
+
+                _logger.LogInformation($"Connection closed for ID {connection?.Id ?? "Unknown"}");
+
+                await OnDisconnectedAsync(connection, exception);
             }
-
-            _logger.LogInformation($"Connection closed for ID {connection.Id}");
-
-            await OnDisconnectedAsync(connection, exception);
         }
 
         public virtual async Task OnConnectedAsync(Connection connection)

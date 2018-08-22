@@ -8,7 +8,7 @@ using Newtonsoft.Json.Linq;
 
 namespace MorseL.Common.Serialization
 {
-    public static class Json
+    internal static class Json
     {
         private static readonly JsonSerializer _serializer = new JsonSerializer();
         private static readonly MorseLJsonSerializerSettings _settings = new MorseLJsonSerializerSettings();

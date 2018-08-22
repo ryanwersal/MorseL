@@ -38,7 +38,7 @@ namespace MorseL.Scaleout.Redis
         /// Keeps track of connected Connection IDs. 
         /// Concurrent HashSet (ConnectionId -> Nothing)
         /// </summary>
-        private readonly IDictionary<string, object> _connections = new ConcurrentDictionary<string, object>();
+        private readonly IDictionary<string, OnMessageDelegate> _connections = new ConcurrentDictionary<string, OnMessageDelegate>();
 
         /// <summary>
         /// Keeps track of locally registered groups to Connection IDs.
@@ -71,11 +71,17 @@ namespace MorseL.Scaleout.Redis
             );
         }
 
-        public event OnMessageDelegate OnMessage;
+        internal int OnMessageCount => _onMessage?.GetInvocationList().Count() ?? 0;
+        private OnMessageDelegate _onMessage;
 
-        public async Task OnClientConnectedAsync(string connectionId)
+        public async Task OnClientConnectedAsync(string connectionId, OnMessageDelegate onMessageDelegate)
         {
-            _connections.Add(connectionId, null);
+            _connections.Add(connectionId, onMessageDelegate);
+
+            if (onMessageDelegate != null)
+            {
+                _onMessage += onMessageDelegate;
+            }
 
             var subscriber = Cache.Multiplexer.GetSubscriber();
 
@@ -88,6 +94,11 @@ namespace MorseL.Scaleout.Redis
 
         public async Task OnClientDisconnectedAsync(string connectionId)
         {
+            if (_connections.TryGetValue(connectionId, out var onMessageDelegate) && onMessageDelegate != null)
+            {
+                _onMessage -= onMessageDelegate;
+            }
+
             _connections.Remove(connectionId);
 
             var subscriber = Cache.Multiplexer.GetSubscriber();
@@ -215,8 +226,8 @@ namespace MorseL.Scaleout.Redis
         }
 
         private async Task InvokeOnMessage(RedisChannel connectionId, RedisValue message) {
-            if (OnMessage != null) {
-                await OnMessage(
+            if (_onMessage != null) {
+                await _onMessage(
                     connectionId,
                     JsonConvert.DeserializeObject<Message>(message)
                 ).ConfigureAwait(false);
@@ -231,7 +242,7 @@ namespace MorseL.Scaleout.Redis
             return RedisKeyGroupPrefix + group;
         }
 
-        internal IDictionary<string, Object> Connections => _connections;
+        internal IDictionary<string, OnMessageDelegate> Connections => _connections;
         internal IDictionary<string, IDictionary<string, object>> Groups => _groups;
         internal IDictionary<string, IDictionary<string, object>> Subscriptions => _subscriptions;
     }

@@ -7,8 +7,7 @@ namespace MorseL.Scaleout
 
     public interface IBackplane
     {
-        event OnMessageDelegate OnMessage;
-        Task OnClientConnectedAsync(string connectionId);
+        Task OnClientConnectedAsync(string connectionId, OnMessageDelegate messageDelegate);
         Task OnClientDisconnectedAsync(string connectionId);
         Task Subscribe(string group, string connectionId);
         Task SubscribeAll(string group);

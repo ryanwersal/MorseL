@@ -74,12 +74,14 @@ namespace MorseL
                     }
                 }
 
-                await _backplane.OnClientConnectedAsync(connection.Id);
-                _backplane.OnMessage += async (connectionId, message) => {
-                    if (connectionId.Equals(connection.Id)) {
-                        await connection.Channel.SendMessageAsync(message);
-                    }
-                };
+                await _backplane.OnClientConnectedAsync(
+                    connection.Id,
+                    async (connectionId, message) => {
+                        if (connectionId.Equals(connection.Id))
+                        {
+                            await connection.Channel.SendMessageAsync(message);
+                        }
+                    });
             }
             catch (Exception ex)
             {
