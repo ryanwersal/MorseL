@@ -63,6 +63,7 @@ namespace MorseL
                 {
                     var hubActivator = scope.ServiceProvider.GetRequiredService<IHubActivator<THub, TClient>>();
                     var hub = hubActivator.Create();
+
                     try
                     {
                         InitializeHub(hub, connection);

@@ -23,6 +23,19 @@ namespace MorseL.Tests
         private int _nextId;
 
         [Fact]
+        public async void HubActivatorReleasedWhenExceptionThrownInOnConnectedAsync()
+        {
+            var serviceProvider = CreateServiceProvider(s => s.AddSingleton(typeof(IHubActivator<,>), typeof(DefaultHubActivator<,>)));
+            var actualHub = serviceProvider.GetRequiredService<HubWebSocketHandler<BadHub>>();
+            var hubActivator = serviceProvider.GetRequiredService<IHubActivator<BadHub, IClientInvoker>> ();
+            var webSocket = new LinkedFakeSocket();
+
+            await Assert.ThrowsAnyAsync<Exception>(() => actualHub.OnConnected(webSocket, new DefaultHttpContext()));
+
+            Assert.True(((DefaultHubActivator<BadHub, IClientInvoker>)hubActivator)._disposed);
+        }
+
+        [Fact]
         public async void CanCallVoidMethodOnHub()
         {
             var serviceProvider = CreateServiceProvider();
@@ -211,7 +224,8 @@ namespace MorseL.Tests
             Assert.Equal($"Invalid message received \"{message}\" from {connection.Id}", exception.Message);
         }
 
-        private async Task<Connection> CreateHubConnectionFromSocket(HubWebSocketHandler<TestHub> actualHub, LinkedFakeSocket webSocket)
+        private async Task<Connection> CreateHubConnectionFromSocket<THub>(HubWebSocketHandler<THub> actualHub, LinkedFakeSocket webSocket)
+            where THub : Hub
         {
             var connection = await actualHub.OnConnected(webSocket, new DefaultHttpContext());
 
@@ -284,6 +298,14 @@ namespace MorseL.Tests
             addServices?.Invoke(services);
 
             return services.BuildServiceProvider();
+        }
+
+        public class BadHub : Hub
+        {
+            public override Task OnConnectedAsync(Connection connection)
+            {
+                throw new Exception();
+            }
         }
 
         public class TestHub : Hub
