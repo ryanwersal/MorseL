@@ -23,7 +23,7 @@ namespace MorseL
 {
     public class HubWebSocketHandler<THub> : HubWebSocketHandler<THub, IClientInvoker> where THub : Hub<IClientInvoker>
     {
-        public HubWebSocketHandler(IServiceProvider services, ILoggerFactory loggerFactory, IServiceScopeFactory serviceScopeFactory)
+        public HubWebSocketHandler(IServiceProvider services, ILoggerFactory loggerFactory)
             : base(services, loggerFactory)
         {
         }
@@ -49,7 +49,7 @@ namespace MorseL
             _logger = loggerFactory.CreateLogger<HubWebSocketHandler<THub, TClient>>();
             _serviceScopeFactory = services.GetRequiredService<IServiceScopeFactory>();
             _backplane = services.GetService<IBackplane>();
-            _morselOptions = services.GetService<IOptions<MorseLOptions>>().Value;
+            _morselOptions = services.GetRequiredService<IOptions<MorseLOptions>>().Value;
 
             _authorizeData = typeof(THub).GetTypeInfo().GetCustomAttributes().OfType<IAuthorizeData>().ToArray();
             DiscoverHubMethods();
