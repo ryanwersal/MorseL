@@ -4,18 +4,15 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Net.WebSockets;
 using System.Threading.Tasks;
-using Microsoft.Extensions.DependencyInjection;
-using MorseL.Sockets.Middleware;
 
 namespace MorseL.Sockets
 {
     /// <summary>
     /// Singleton instance that manages all Connections.
     /// </summary>
-    public class WebSocketConnectionManager
+    public class WebSocketConnectionManager : IWebSocketConnectionManager
     {
         private readonly ConcurrentDictionary<string, Connection> _connections = new ConcurrentDictionary<string, Connection>();
-
 
         public Connection GetConnectionById(string id)
         {
@@ -51,8 +48,9 @@ namespace MorseL.Sockets
 
         public async Task RemoveConnection(string id)
         {
-            _connections.TryRemove(id, out Connection connection);
+            _connections.TryRemove(id, out var connection);
             await connection.DisposeAsync();
+            connection = null;
         }
 
         private static string CreateConnectionId()
