@@ -34,7 +34,7 @@ namespace MorseL
         // Used to track the last 100 requests to ignore duplicates
         private readonly LruCache<int, bool> _requests = new LruCache<int, bool>(100);
 
-        private readonly Dictionary<string, HubMethodDescriptor> _methods = new Dictionary<string, HubMethodDescriptor>(StringComparer.OrdinalIgnoreCase);
+        private readonly HubMethodDiscoverer<THub, TClient> _hubMethodDiscoverer;
 
         private readonly IServiceProvider _services;
         private readonly IServiceScopeFactory _serviceScopeFactory;
@@ -52,7 +52,8 @@ namespace MorseL
             _morselOptions = services.GetRequiredService<IOptions<MorseLOptions>>().Value;
 
             _authorizeData = typeof(THub).GetTypeInfo().GetCustomAttributes().OfType<IAuthorizeData>().ToArray();
-            DiscoverHubMethods();
+
+            _hubMethodDiscoverer = new HubMethodDiscoverer<THub, TClient>(loggerFactory);
         }
 
         public override async Task OnConnectedAsync(Connection connection)
@@ -129,52 +130,12 @@ namespace MorseL
             hub.Groups = ActivatorUtilities.CreateInstance<GroupsDispatcher>(_services);
         }
 
-        private void DiscoverHubMethods()
-        {
-            var hubType = typeof(THub);
-            foreach (var methodInfo in hubType.GetMethods().Where(IsHubMethod))
-            {
-                var methodName = methodInfo.Name;
-
-                if (_methods.ContainsKey(methodName))
-                {
-                    throw new NotSupportedException($"Duplicate definitions of '{methodName}'. Overloading is not supported.");
-                }
-
-                var executor = ObjectMethodExecutor.Create(methodInfo, hubType.GetTypeInfo());
-                _methods[methodName] = new HubMethodDescriptor(executor);
-
-                if (_logger.IsEnabled(LogLevel.Trace))
-                {
-                    _logger.LogTrace("Hub method '{methodName}' is bound", methodName);
-                }
-            }
-        }
-
-        private static bool IsHubMethod(MethodInfo methodInfo)
-        {
-            // TODO: Add more checks
-            if (!methodInfo.IsPublic || methodInfo.IsSpecialName)
-            {
-                return false;
-            }
-
-            var baseDefinition = methodInfo.GetBaseDefinition().DeclaringType;
-            var baseType = baseDefinition.GetTypeInfo().IsGenericType ? baseDefinition.GetGenericTypeDefinition() : baseDefinition;
-            if (typeof(Hub<>) == baseType)
-            {
-                return false;
-            }
-
-            return true;
-        }
-
         public override async Task ReceiveAsync(Connection connection, string serializedInvocationDescriptor)
         {
             InvocationDescriptor invocationDescriptor = null;
             try
             {
-                invocationDescriptor = Json.DeserializeInvocationDescriptor(serializedInvocationDescriptor, _methods.Values.Select(d => d.MethodExecutor.MethodInfo).ToArray());
+                invocationDescriptor = Json.DeserializeInvocationDescriptor(serializedInvocationDescriptor, _hubMethodDiscoverer.GetMethodInfos());
             }
             catch (Exception)
             {
@@ -189,7 +150,7 @@ namespace MorseL
             }
 
             HubMethodDescriptor descriptor;
-            if (!_methods.TryGetValue(invocationDescriptor.MethodName, out descriptor))
+            if (!_hubMethodDiscoverer.TryGetHubMethodDescriptor(invocationDescriptor.MethodName, out descriptor))
             {
                 // Really strange and unlikely, valid JSON and was known but not found here
                 // Likely not possible
@@ -429,22 +390,6 @@ namespace MorseL
             }
 
             return true;
-        }
-
-        private class HubMethodDescriptor
-        {
-            public HubMethodDescriptor(ObjectMethodExecutor methodExecutor)
-            {
-                MethodExecutor = methodExecutor;
-                ParameterTypes = methodExecutor.ActionParameters.Select(p => p.ParameterType).ToArray();
-                AuthorizeData = methodExecutor.MethodInfo.GetCustomAttributes().OfType<AuthorizeAttribute>().ToArray();
-            }
-
-            public ObjectMethodExecutor MethodExecutor { get; }
-
-            public Type[] ParameterTypes { get; }
-
-            public IAuthorizeData[] AuthorizeData { get; }
         }
     }
 }
