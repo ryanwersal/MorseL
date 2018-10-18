@@ -1,0 +1,72 @@
+jobs:
+- job: Linux
+  pool:
+    vmImage: 'Ubuntu 16.04'
+
+  steps:
+  - script: dotnet restore
+    displayName: 'Restore dependencies'
+
+  - script: dotnet build
+    displayName: 'Build'
+
+  - script: |
+      dotnet test test/MorseL.Client.Tests --logger trx
+      dotnet test test/MorseL.Client.WebSockets.Tests --logger trx
+      dotnet test test/MorseL.Scaleout.Tests --logger trx
+      dotnet test test/MorseL.Sockets.Tests --logger trx
+      dotnet test test/MorseL.Tests --logger trx
+    displayName: 'Run automated tests'
+
+  - task: PublishTestResults@2
+    inputs:
+      testRunner: VSTest
+      testResultsFiles: '**/*.trx'
+
+- job: Windows
+  pool:
+    vmImage: 'vs2017-win2016'
+
+  steps:
+  - script: dotnet restore
+    displayName: 'Restore dependencies'
+
+  - script: dotnet build
+    displayName: 'Build'
+
+  - script: |
+      dotnet test test/MorseL.Client.Tests --logger trx
+      dotnet test test/MorseL.Client.WebSockets.Tests --logger trx
+      dotnet test test/MorseL.Scaleout.Tests --logger trx
+      dotnet test test/MorseL.Sockets.Tests --logger trx
+      dotnet test test/MorseL.Tests --logger trx
+    displayName: 'Run automated tests'
+
+  - task: PublishTestResults@2
+    inputs:
+      testRunner: VSTest
+      testResultsFiles: '**/*.trx'
+
+- job: macOS
+  pool:
+    vmImage: 'macOS-10.13'
+
+  steps:
+  - script: dotnet restore
+    displayName: 'Restore dependencies'
+
+  - script: dotnet build
+    displayName: 'Build'
+
+  - script: |
+      dotnet test test/MorseL.Client.Tests --logger trx
+      dotnet test test/MorseL.Client.WebSockets.Tests --logger trx
+      dotnet test test/MorseL.Scaleout.Tests --logger trx
+      dotnet test test/MorseL.Sockets.Tests --logger trx
+      dotnet test test/MorseL.Tests --logger trx
+    displayName: 'Run automated tests'
+
+  - task: PublishTestResults@2
+    inputs:
+      testRunner: VSTest
+      testResultsFiles: '**/*.trx'
