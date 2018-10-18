@@ -93,7 +93,7 @@ namespace MorseL.Tests
 
             await sut.OnDisconnectedAsync(connection, null);
 
-            Mocker.BackplaneMock.Verify(m => m.OnClientDisconnectedAsync(It.Is<string>(v => v == connectionId)), Times.Once);
+            Mocker.BackplaneMock.Verify(m => m.OnClientDisconnectedAsync(connectionId), Times.Once);
         }
 
         [Fact]
@@ -125,7 +125,7 @@ namespace MorseL.Tests
                 await sut.OnDisconnectedAsync(connection, null);
             });
 
-            Mocker.BackplaneMock.Verify(m => m.OnClientDisconnectedAsync(It.Is<string>(v => v == connectionId)), Times.Once);
+            Mocker.BackplaneMock.Verify(m => m.OnClientDisconnectedAsync(connectionId), Times.Once);
         }
     }
 }

@@ -19,7 +19,7 @@ namespace MorseL.Internal
             DiscoverHubMethods();
         }
 
-        public MethodInfo[] GetMethodInfos()
+        public MethodInfo[] GetAllMethodInfo()
         {
             return _methods.Values.Select(d => d.MethodExecutor.MethodInfo).ToArray();
         }

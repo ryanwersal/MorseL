@@ -135,7 +135,7 @@ namespace MorseL
             InvocationDescriptor invocationDescriptor = null;
             try
             {
-                invocationDescriptor = Json.DeserializeInvocationDescriptor(serializedInvocationDescriptor, _hubMethodDiscoverer.GetMethodInfos());
+                invocationDescriptor = Json.DeserializeInvocationDescriptor(serializedInvocationDescriptor, _hubMethodDiscoverer.GetAllMethodInfo());
             }
             catch (Exception)
             {
