@@ -54,10 +54,8 @@ namespace MorseL.Shared.Tests
             var connection = new Connection(ConnectionId, ChannelMock.Object);
 
             WebSocketConnectionManagerMock.Setup(m => m.AddConnection(It.IsAny<IChannel>())).Returns(connection);
-            WebSocketConnectionManagerMock.Setup(m => m.GetConnectionById(It.Is<string>(s => s == ConnectionId)))
-                .Returns(connection);
-            WebSocketConnectionManagerMock.Setup(m => m.GetConnection(It.Is<WebSocket>(ws => ws == WebSocketMock.Object)))
-                .Returns(connection);
+            WebSocketConnectionManagerMock.Setup(m => m.GetConnectionById(ConnectionId)).Returns(connection);
+            WebSocketConnectionManagerMock.Setup(m => m.GetConnection(WebSocketMock.Object)).Returns(connection);
 
             var loggerMock = new Mock<ILogger>();
             LoggerFactoryMock.Setup(m => m.CreateLogger(It.IsAny<string>())).Returns(loggerMock.Object);
@@ -85,7 +83,7 @@ namespace MorseL.Shared.Tests
 
         public void RegisterService<TService>(Mock<TService> mock) where TService : class
         {
-            ServiceProviderMock.Setup(m => m.GetService(It.Is<Type>(t => t == typeof(TService)))).Returns(mock.Object);
+            ServiceProviderMock.Setup(m => m.GetService(typeof(TService))).Returns(mock.Object);
         }
 
         public Mock<IHubActivator<THub, IClientInvoker>> RegisterHub<THub>(THub hub = null) where THub : Hub<IClientInvoker>, new()
@@ -93,11 +91,10 @@ namespace MorseL.Shared.Tests
             var hubActivatorMock = new Mock<IHubActivator<THub, IClientInvoker>>();
             hubActivatorMock.Setup(m => m.Create()).Returns(hub ?? new THub());
 
-            _hubActivatorProviderMock.Setup(m => m.GetService(It.Is<Type>(t => t == typeof(THub))))
-                                    .Returns(hubActivatorMock);
+            _hubActivatorProviderMock.Setup(m => m.GetService(typeof(THub))).Returns(hubActivatorMock);
 
-            ServiceProviderMock.Setup(m => m.GetService(It.Is<Type>(t => t == typeof(IHubActivator<THub, IClientInvoker>))))
-                        .Returns(hubActivatorMock.Object);
+            ServiceProviderMock.Setup(m => m.GetService(typeof(IHubActivator<THub, IClientInvoker>)))
+                .Returns(hubActivatorMock.Object);
 
             return hubActivatorMock;
         }

@@ -46,7 +46,7 @@ namespace MorseL.Tests
             var discoverer = new HubMethodDiscoverer<AccessibilityHub, IClientInvoker>(
                 Mocker.LoggerFactoryMock.Object);
             Assert.Contains(discoverer._methods, m => m.Key == "PublicMethod");
-            Assert.Equal(discoverer._methods.Count, 1);
+            Assert.Equal(1, discoverer._methods.Count);
         }
 
         [Fact]
@@ -55,7 +55,7 @@ namespace MorseL.Tests
             var discoverer = new HubMethodDiscoverer<AccessibilityHub, IClientInvoker>(
                 Mocker.LoggerFactoryMock.Object);
             Assert.DoesNotContain(discoverer._methods, m => m.Key == "ProtectedMethod");
-            Assert.Equal(discoverer._methods.Count, 1);
+            Assert.Equal(1, discoverer._methods.Count);
         }
 
         [Fact]
@@ -64,7 +64,7 @@ namespace MorseL.Tests
             var discoverer = new HubMethodDiscoverer<AccessibilityHub, IClientInvoker>(
                 Mocker.LoggerFactoryMock.Object);
             Assert.DoesNotContain(discoverer._methods, m => m.Key == "PrivateMethod");
-            Assert.Equal(discoverer._methods.Count, 1);
+            Assert.Equal(1, discoverer._methods.Count);
         }
 
         [Fact]
@@ -73,7 +73,7 @@ namespace MorseL.Tests
             var discoverer = new HubMethodDiscoverer<AccessibilityHub, IClientInvoker>(
                 Mocker.LoggerFactoryMock.Object);
             Assert.DoesNotContain(discoverer._methods, m => m.Key == "InternalMethod");
-            Assert.Equal(discoverer._methods.Count, 1);
+            Assert.Equal(1, discoverer._methods.Count);
         }
 
         public class BaseHub : Hub<IClientInvoker>
@@ -92,7 +92,7 @@ namespace MorseL.Tests
             var discoverer = new HubMethodDiscoverer<SubclassHub, IClientInvoker>(
                 Mocker.LoggerFactoryMock.Object);
             Assert.Contains(discoverer._methods, m => m.Key == "SubclassMethod");
-            Assert.Equal(discoverer._methods.Count, 2);
+            Assert.Equal(2, discoverer._methods.Count);
         }
 
         [Fact]
@@ -101,7 +101,7 @@ namespace MorseL.Tests
             var discoverer = new HubMethodDiscoverer<SubclassHub, IClientInvoker>(
                 Mocker.LoggerFactoryMock.Object);
             Assert.Contains(discoverer._methods, m => m.Key == "BaseMethod");
-            Assert.Equal(discoverer._methods.Count, 2);
+            Assert.Equal(2, discoverer._methods.Count);
         }
     }
 }

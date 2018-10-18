@@ -45,13 +45,12 @@ namespace MorseL.Sockets.Test
             RequestDelegateMock.Setup(m => m.Next(It.IsAny<HttpContext>())).Returns(Task.CompletedTask);
         }
 
-        private MorseLHttpMiddleware CreateMorseLHttpMiddleware(CancellationTokenSource cts = default(CancellationTokenSource))
+        private MorseLHttpMiddleware CreateMorseLHttpMiddleware()
         {
             return new MorseLHttpMiddleware(
                 Mocker.ServiceProviderMock.Object.GetRequiredService<ILogger<MorseLHttpMiddleware>>(),
                 RequestDelegateMock.Object.Next,
-                typeof(HubWebSocketHandler<MiddlewareTestHub>),
-                cts);
+                typeof(HubWebSocketHandler<MiddlewareTestHub>));
         }
 
         [Fact]
@@ -63,7 +62,7 @@ namespace MorseL.Sockets.Test
 
             await sut.Invoke(Mocker.HttpContextMock.Object);
 
-            RequestDelegateMock.Verify(m => m.Next(It.Is<HttpContext>(hc => hc == Mocker.HttpContextMock.Object)), Times.Once);
+            RequestDelegateMock.Verify(m => m.Next(Mocker.HttpContextMock.Object), Times.Once);
         }
 
         [Fact]
@@ -95,22 +94,7 @@ namespace MorseL.Sockets.Test
 
             await sut.Invoke(Mocker.HttpContextMock.Object);
 
-            Mocker.WebSocketConnectionManagerMock
-                .Verify(m => m.RemoveConnection(It.Is<string>(s => s == Mocker.ConnectionId)), Times.Once);
-        }
-
-        [Fact]
-        public async Task WebSocketRequest_ShouldBeRemovedFromConnectionManager_IfCancellationIsRequested()
-        {
-            var cts = new CancellationTokenSource();
-            cts.Cancel();
-
-            var sut = CreateMorseLHttpMiddleware(cts);
-
-            await sut.Invoke(Mocker.HttpContextMock.Object);
-
-            Mocker.WebSocketConnectionManagerMock
-                .Verify(m => m.RemoveConnection(It.Is<string>(s => s == Mocker.ConnectionId)), Times.Once);
+            Mocker.WebSocketConnectionManagerMock.Verify(m => m.RemoveConnection(Mocker.ConnectionId), Times.Once);
         }
 
         [Fact]
@@ -124,8 +108,7 @@ namespace MorseL.Sockets.Test
 
             await sut.Invoke(Mocker.HttpContextMock.Object);
 
-            Mocker.WebSocketConnectionManagerMock
-                .Verify(m => m.RemoveConnection(It.Is<string>(s => s == Mocker.ConnectionId)), Times.Once);
+            Mocker.WebSocketConnectionManagerMock.Verify(m => m.RemoveConnection(Mocker.ConnectionId), Times.Once);
         }
 
         [Fact]
@@ -136,17 +119,14 @@ namespace MorseL.Sockets.Test
             var sut = CreateMorseLHttpMiddleware();
 
             // Fire and forget since this is essentially just an infinite loop
-#pragma warning disable CS4014 // Because this call is not awaited, execution of the current method continues before the call is completed
-            sut.Invoke(Mocker.HttpContextMock.Object);
-#pragma warning restore CS4014 // Because this call is not awaited, execution of the current method continues before the call is completed
+            var _ = sut.Invoke(Mocker.HttpContextMock.Object);
 
             // We eventually need to transition the socket to closed so as to simulate
             // a proper close of the web socket.
             await Task.Delay(TimeSpan.FromMilliseconds(5));
             Mocker.WebSocketMock.Setup(m => m.State).Returns(WebSocketState.Closed);
 
-            Mocker.WebSocketConnectionManagerMock
-                .Verify(m => m.RemoveConnection(It.Is<string>(s => s == Mocker.ConnectionId)), Times.AtLeastOnce); 
+            Mocker.WebSocketConnectionManagerMock.Verify(m => m.RemoveConnection(Mocker.ConnectionId), Times.AtLeastOnce); 
         }
 
         [Fact]
