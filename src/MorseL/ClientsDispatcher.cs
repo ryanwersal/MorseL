@@ -13,10 +13,10 @@ namespace MorseL
     public class ClientsDispatcher
     {
         private readonly ILogger _logger;
-        private WebSocketConnectionManager Manager { get; }
+        private IWebSocketConnectionManager Manager { get; }
         private IBackplane Backplane { get; }
 
-        public ClientsDispatcher(WebSocketConnectionManager manager, IBackplane backplane, ILogger<ClientsDispatcher> logger)
+        public ClientsDispatcher(IWebSocketConnectionManager manager, IBackplane backplane, ILogger<ClientsDispatcher> logger)
         {
             Manager = manager;
             Backplane = backplane;

@@ -11,9 +11,7 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using MorseL.Diagnostics;
-using MorseL.Sockets.Internal;
 using MorseL.Sockets.Middleware;
-using Microsoft.Extensions.Options;
 using Nito.AsyncEx.Synchronous;
 using MorseL.Common;
 
@@ -53,13 +51,17 @@ namespace MorseL.Sockets
     {
         private readonly ILogger _logger;
         private readonly RequestDelegate _next;
+        private readonly CancellationTokenSource _cts;
 
         private Type HandlerType { get; }
 
-        public MorseLHttpMiddleware(ILogger<MorseLHttpMiddleware> logger, RequestDelegate next, Type handlerType)
+        public MorseLHttpMiddleware(
+            ILogger<MorseLHttpMiddleware> logger, RequestDelegate next, 
+            Type handlerType, CancellationTokenSource cts = default(CancellationTokenSource))
         {
             _logger = logger;
             _next = next;
+            _cts = cts ?? new CancellationTokenSource();
             HandlerType = handlerType;
         }
 
@@ -71,81 +73,95 @@ namespace MorseL.Sockets
                 return;
             }
 
-            var cts = new CancellationTokenSource();
-            Exception pendingException = null;
-
-            using (var serviceScope = context.RequestServices.CreateScope())
+            WebSocketHandler handler = null;
+            try
             {
-                var services = serviceScope.ServiceProvider;
-                var middleware = services.GetServices<IMiddleware>().ToList();
-
-                var handler = ActivatorUtilities.CreateInstance(services, HandlerType) as WebSocketHandler;
-                if (handler == null)
+                Exception pendingException = null;
+                using (var serviceScope = context.RequestServices.CreateScope())
                 {
-                    throw new Exception("Invalid handler type specified. Must be a Hub.");
-                }
+                    var services = serviceScope.ServiceProvider;
+                    var middleware = services.GetServices<IMiddleware>().ToList();
 
-                var socket = await context.WebSockets.AcceptWebSocketAsync().ConfigureAwait(false);
+                    handler = ActivatorUtilities.CreateInstance(services, HandlerType) as WebSocketHandler;
+                    if (handler == null)
+                    {
+                        throw new Exception("Invalid handler type specified. Must be a Hub.");
+                    }
 
-                try
-                {
-                    // TODO : Consider/Decide on pulling web socket manager outside of handler
-                    var connection = await handler.OnConnected(socket, context).ConfigureAwait(false);
+                    var socket = await context.WebSockets.AcceptWebSocketAsync().ConfigureAwait(false);
 
-                    await Receive(socket, connection, middleware, cts,
-                        async (result, serializedInvocationDescriptor) =>
-                        {
-                            if (result.MessageType == WebSocketMessageType.Text || result.MessageType == WebSocketMessageType.Binary)
+                    try
+                    {
+                        // TODO : Consider/Decide on pulling web socket manager outside of handler
+                        var connection = await handler.OnConnected(socket, context).ConfigureAwait(false);
+
+                        await Receive(socket, connection, middleware, _cts,
+                            async (result, serializedInvocationDescriptor) =>
                             {
+                                if (result.MessageType == WebSocketMessageType.Text || result.MessageType == WebSocketMessageType.Binary)
+                                {
                                 // We call the connection arg'd method directly to allow for middleware to override the IChannel
                                 var unawaitedTask = Task.Run(async () =>
-                                {
-                                    try
                                     {
-                                        await handler.ReceiveAsync(connection, serializedInvocationDescriptor).ConfigureAwait(false);
-                                    }
-                                    catch (Exception exception)
-                                    {
+                                        try
+                                        {
+                                            await handler.ReceiveAsync(connection, serializedInvocationDescriptor).ConfigureAwait(false);
+                                        }
+                                        catch (Exception exception)
+                                        {
                                         // An exception here means it was thrown during message handling (not in the Hub method itself)
                                         // This is a big issue (likely message serialization) and can't be "saved"
                                         // We'll store the exception and rethrow after the receive loop is brought down
                                         pendingException = exception;
-                                        cts.Cancel();
-                                    }
+                                            _cts.Cancel();
+                                        }
 
-                                }).ConfigureAwait(false);
-                            }
-                            else if (result.MessageType == WebSocketMessageType.Close)
-                            {
-                                await handler.OnDisconnected(socket, null);
-                            }
-                        }).ConfigureAwait(false);
+                                    }).ConfigureAwait(false);
+                                }
+                                else if (result.MessageType == WebSocketMessageType.Close)
+                                {
+                                    await handler.OnDisconnected(socket, null);
+                                }
+                            }).ConfigureAwait(false);
 
-                    // Rethrow any exception thrown during message processing that broke our receive loop
-                    if (pendingException != null)
+                        // Rethrow any exception thrown during message processing that broke our receive loop
+                        if (pendingException != null)
+                        {
+                            ExceptionDispatchInfo.Capture(pendingException).Throw();
+                        }
+                    }
+                    catch (Exception exception)
                     {
-                        ExceptionDispatchInfo.Capture(pendingException).Throw();
+                        if (pendingException == null || pendingException != exception)
+                        {
+                            pendingException = exception;
+                        }
+
+                        _logger?.LogError(new EventId(), exception, "Exception thrown during receive loop");
+
+                        if (exception is MorseLException)
+                        {
+                            // For now, rethrow morsel exceptions
+                            throw;
+                        }
+                    }
+                    finally
+                    {
+                        try
+                        {
+                            await handler.OnDisconnected(socket, pendingException);
+                        }
+                        catch (WebSocketException webSocketException)
+                        {
+                            _logger?.LogWarning(new EventId(), webSocketException, "Exception attempting to close socket");
+                        }
                     }
                 }
-                catch (Exception exception)
-                {
-                    _logger?.LogError(new EventId(), exception, "Exception thrown during receive loop");
-
-                    try
-                    {
-                        await handler.OnDisconnected(socket, exception);
-                    }
-                    catch (WebSocketException webSocketException)
-                    {
-                        _logger?.LogWarning(webSocketException.Message);
-                    }
-
-                    if (exception is MorseLException)
-                    {
-                        // For now, rethrow morsel exceptions
-                        throw;
-                    }
-                }
+            }
+            finally
+            {
+                handler = null;
+                _cts.Dispose();
             }
         }
 

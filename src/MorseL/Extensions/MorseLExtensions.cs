@@ -1,16 +1,11 @@
 ﻿using System;
-using System.Collections;
-using System.Collections.Generic;
-using System.Linq.Expressions;
 using System.Reflection;
-using System.Threading.Tasks;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using MorseL.Scaleout;
 using MorseL.Sockets;
-using MorseL.Sockets.Middleware;
 
 namespace MorseL.Extensions
 {
@@ -19,7 +14,7 @@ namespace MorseL.Extensions
         public static IMorseLBuilder AddMorseL(this IServiceCollection services, Action<MorseLOptions> options = null)
         {
             services.AddSingleton<IBackplane, DefaultBackplane>();
-            services.AddSingleton<WebSocketConnectionManager>();
+            services.AddSingleton<IWebSocketConnectionManager, WebSocketConnectionManager>();
             services.AddSingleton(typeof(HubWebSocketHandler<>), typeof(HubWebSocketHandler<>));
             services.AddScoped(typeof(IHubActivator<,>), typeof(DefaultHubActivator<,>));
 

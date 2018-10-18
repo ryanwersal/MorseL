@@ -1,5 +1,4 @@
 ﻿using System;
-using System.Collections.Generic;
 using System.Net.WebSockets;
 using System.Runtime.CompilerServices;
 using System.Threading.Tasks;
@@ -7,7 +6,6 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using MorseL.Common;
-using MorseL.Sockets.Middleware;
 
 [assembly: InternalsVisibleTo("MorseL.Scaleout.Tests")]
 [assembly: InternalsVisibleTo("MorseL.Scaleout.Redis.Tests")]
@@ -27,12 +25,12 @@ namespace MorseL.Sockets
     {
         private readonly IServiceProvider _services;
         private readonly ILogger _logger;
-        protected WebSocketConnectionManager WebSocketConnectionManager { get; }
+        protected IWebSocketConnectionManager webSocketManager { get; }
 
         protected WebSocketHandler(IServiceProvider services, ILoggerFactory loggerFactory)
         {
             _services = services;
-            WebSocketConnectionManager = services.GetRequiredService<WebSocketConnectionManager>();
+            webSocketManager = services.GetRequiredService<IWebSocketConnectionManager>();
             _logger = loggerFactory.CreateLogger<WebSocketHandler>();
         }
 
@@ -40,7 +38,7 @@ namespace MorseL.Sockets
         {
             // Create the websocket channel / connection
             var channel = ActivatorUtilities.CreateInstance<WebSocketChannel>(_services, socket);
-            var connection = WebSocketConnectionManager.AddConnection(channel);
+            var connection = webSocketManager.AddConnection(channel);
 
             // Set the internal channel's reference to it's containing connection
             channel.Connection = connection;
@@ -62,7 +60,7 @@ namespace MorseL.Sockets
             catch (Exception e)
             {
                 _logger.LogError(e.Message);
-                await WebSocketConnectionManager.RemoveConnection(connection.Id);
+                await webSocketManager.RemoveConnection(connection.Id);
                 throw;
             }
 
@@ -71,13 +69,13 @@ namespace MorseL.Sockets
 
         internal async Task OnDisconnected(WebSocket socket, Exception exception)
         {
-            var connection = WebSocketConnectionManager.GetConnection(socket);
+            var connection = webSocketManager.GetConnection(socket);
 
             if (connection != null)
             {
                 try
                 {
-                    await WebSocketConnectionManager.RemoveConnection(connection.Id).ConfigureAwait(false);
+                    await webSocketManager.RemoveConnection(connection.Id).ConfigureAwait(false);
                 }
                 catch (Exception removeException)
                 {
