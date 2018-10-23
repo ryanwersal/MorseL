@@ -3,19 +3,19 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio 15
 VisualStudioVersion = 15.0.26403.3
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "MorseL.Common", "src\MorseL.Common\MorseL.Common.csproj", "{E02806BF-EA9F-4A4C-86ED-68D68BA49ABF}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MorseL.Common", "src\MorseL.Common\MorseL.Common.csproj", "{E02806BF-EA9F-4A4C-86ED-68D68BA49ABF}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "MorseL", "src\MorseL\MorseL.csproj", "{633F738C-659D-40A5-B46E-3C9B28F279A6}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MorseL", "src\MorseL\MorseL.csproj", "{633F738C-659D-40A5-B46E-3C9B28F279A6}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "MorseL.Client", "src\MorseL.Client\MorseL.Client.csproj", "{2D78B356-07F6-421A-9717-B7CD63897263}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MorseL.Client", "src\MorseL.Client\MorseL.Client.csproj", "{2D78B356-07F6-421A-9717-B7CD63897263}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "MorseL.Tests", "test\MorseL.Tests\MorseL.Tests.csproj", "{055CA15E-2D9C-4305-AC65-A58CC89F3072}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MorseL.Tests", "test\MorseL.Tests\MorseL.Tests.csproj", "{055CA15E-2D9C-4305-AC65-A58CC89F3072}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "MorseL.Sockets", "src\MorseL.Sockets\MorseL.Sockets.csproj", "{4D90D7FC-8628-4681-8EDA-E03422D5D698}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MorseL.Sockets", "src\MorseL.Sockets\MorseL.Sockets.csproj", "{4D90D7FC-8628-4681-8EDA-E03422D5D698}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "MorseL.Client.WebSockets", "src\MorseL.Client.WebSockets\MorseL.Client.WebSockets.csproj", "{B0E6626D-FE2C-415C-8768-E70121783091}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MorseL.Client.WebSockets", "src\MorseL.Client.WebSockets\MorseL.Client.WebSockets.csproj", "{B0E6626D-FE2C-415C-8768-E70121783091}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "MorseL.Scaleout", "src\MorseL.Scaleout\MorseL.Scaleout.csproj", "{F828FDF4-16CC-4880-BC4F-CD222F33A9AF}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MorseL.Scaleout", "src\MorseL.Scaleout\MorseL.Scaleout.csproj", "{F828FDF4-16CC-4880-BC4F-CD222F33A9AF}"
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Src", "Src", "{29AAA98F-6709-46E9-81FA-2D4F8C1A7195}"
 EndProject
@@ -23,48 +23,48 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Samples", "Samples", "{76E1
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Tests", "Tests", "{04D2B304-1D1D-49CA-888C-345001F63EF5}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "ChatApplication", "samples\ChatApplication\ChatApplication.csproj", "{C2568D9C-19FF-4F5B-8F2D-E7B5EE865F8C}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ChatApplication", "samples\ChatApplication\ChatApplication.csproj", "{C2568D9C-19FF-4F5B-8F2D-E7B5EE865F8C}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "EchoConsoleClient", "samples\EchoConsoleClient\EchoConsoleClient.csproj", "{AD289824-BEA0-4E21-BB05-6B8CFB6597FD}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "EchoConsoleClient", "samples\EchoConsoleClient\EchoConsoleClient.csproj", "{AD289824-BEA0-4E21-BB05-6B8CFB6597FD}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "MvcSample", "samples\MvcSample\MvcSample.csproj", "{F101E926-534A-4F69-8D21-A05FE43F2B23}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MvcSample", "samples\MvcSample\MvcSample.csproj", "{F101E926-534A-4F69-8D21-A05FE43F2B23}"
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution Items", "{7FFF1586-8DDF-45AE-A1DF-929F8BCE7C5B}"
 	ProjectSection(SolutionItems) = preProject
 		version.props = version.props
 	EndProjectSection
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "MorseL.Client.WebSockets.Tests", "test\MorseL.Client.WebSockets.Tests\MorseL.Client.WebSockets.Tests.csproj", "{7EFD9063-7221-431C-931F-644A9B8005CD}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MorseL.Client.WebSockets.Tests", "test\MorseL.Client.WebSockets.Tests\MorseL.Client.WebSockets.Tests.csproj", "{7EFD9063-7221-431C-931F-644A9B8005CD}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "MorseL.Shared.Tests", "test\MorseL.Shared.Tests\MorseL.Shared.Tests.csproj", "{58A79808-459F-4EC4-987A-57CDFA352307}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MorseL.Shared.Tests", "test\MorseL.Shared.Tests\MorseL.Shared.Tests.csproj", "{58A79808-459F-4EC4-987A-57CDFA352307}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "MorseL.Sockets.Test", "test\MorseL.Sockets.Tests\MorseL.Sockets.Test.csproj", "{8F174739-8946-41B4-B86B-09DD92E2FD3B}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MorseL.Sockets.Test", "test\MorseL.Sockets.Tests\MorseL.Sockets.Test.csproj", "{8F174739-8946-41B4-B86B-09DD92E2FD3B}"
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Stress", "Stress", "{3D2D3437-5505-4EB9-BA89-802301711562}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Orchestrator", "samples\Stress\Orchestrator\Orchestrator.csproj", "{86B8C0C8-5835-4CC9-A6DC-345C2EF4E184}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Orchestrator", "samples\Stress\Orchestrator\Orchestrator.csproj", "{86B8C0C8-5835-4CC9-A6DC-345C2EF4E184}"
 	ProjectSection(ProjectDependencies) = postProject
 		{ECD4F660-F423-4162-8E94-FFAD7CAE4257} = {ECD4F660-F423-4162-8E94-FFAD7CAE4257}
 		{5FF09D76-A446-4971-8690-AF5A934AB5DB} = {5FF09D76-A446-4971-8690-AF5A934AB5DB}
 	EndProjectSection
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Host", "samples\Stress\Host\Host.csproj", "{5FF09D76-A446-4971-8690-AF5A934AB5DB}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Host", "samples\Stress\Host\Host.csproj", "{5FF09D76-A446-4971-8690-AF5A934AB5DB}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Client", "samples\Stress\Client\Client.csproj", "{ECD4F660-F423-4162-8E94-FFAD7CAE4257}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Client", "samples\Stress\Client\Client.csproj", "{ECD4F660-F423-4162-8E94-FFAD7CAE4257}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "MorseL.Diagnostics", "src\MorseL.Diagnostics\MorseL.Diagnostics.csproj", "{468253F3-CD39-4687-8EED-DD8FC6FD68FA}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MorseL.Diagnostics", "src\MorseL.Diagnostics\MorseL.Diagnostics.csproj", "{468253F3-CD39-4687-8EED-DD8FC6FD68FA}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "MorseL.Client.Tests", "test\MorseL.Client.Tests\MorseL.Client.Tests.csproj", "{EF76A3EC-F1F4-4926-8598-387C0899F063}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MorseL.Client.Tests", "test\MorseL.Client.Tests\MorseL.Client.Tests.csproj", "{EF76A3EC-F1F4-4926-8598-387C0899F063}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "MorseL.Scaleout.Redis", "src\MorseL.Scaleout.Redis\MorseL.Scaleout.Redis.csproj", "{7B3EF6AA-4AB9-42D0-9D92-C095CE5B936F}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MorseL.Scaleout.Redis", "src\MorseL.Scaleout.Redis\MorseL.Scaleout.Redis.csproj", "{7B3EF6AA-4AB9-42D0-9D92-C095CE5B936F}"
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "RedisBackplane", "RedisBackplane", "{89EC8B86-8842-4AB1-BD48-1B81F8C441E0}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "BackplanedHost", "samples\RedisBackplane\BackplanedHost\BackplanedHost.csproj", "{4B2EC5FE-7E13-436D-BE5E-1925BABE03AD}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "BackplanedHost", "samples\RedisBackplane\BackplanedHost\BackplanedHost.csproj", "{4B2EC5FE-7E13-436D-BE5E-1925BABE03AD}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "MorseL.Scaleout.Tests", "test\MorseL.Scaleout.Tests\MorseL.Scaleout.Tests.csproj", "{B592F95D-5E15-4F53-A33B-1453BA85EBDA}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MorseL.Scaleout.Tests", "test\MorseL.Scaleout.Tests\MorseL.Scaleout.Tests.csproj", "{B592F95D-5E15-4F53-A33B-1453BA85EBDA}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "MorseL.Scaleout.Redis.Tests", "test\MorseL.Scaleout.Redis.Tests\MorseL.Scaleout.Redis.Tests.csproj", "{92606BC5-6510-4331-8127-11FF61B0602B}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MorseL.Scaleout.Redis.Tests", "test\MorseL.Scaleout.Redis.Tests\MorseL.Scaleout.Redis.Tests.csproj", "{92606BC5-6510-4331-8127-11FF61B0602B}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -196,6 +196,30 @@ Global
 		{F101E926-534A-4F69-8D21-A05FE43F2B23}.Release|x64.Build.0 = Release|Any CPU
 		{F101E926-534A-4F69-8D21-A05FE43F2B23}.Release|x86.ActiveCfg = Release|Any CPU
 		{F101E926-534A-4F69-8D21-A05FE43F2B23}.Release|x86.Build.0 = Release|Any CPU
+		{468253F3-CD39-4687-8EED-DD8FC6FD68FA}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{468253F3-CD39-4687-8EED-DD8FC6FD68FA}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{7B3EF6AA-4AB9-42D0-9D92-C095CE5B936F}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{7B3EF6AA-4AB9-42D0-9D92-C095CE5B936F}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{86B8C0C8-5835-4CC9-A6DC-345C2EF4E184}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{86B8C0C8-5835-4CC9-A6DC-345C2EF4E184}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{5FF09D76-A446-4971-8690-AF5A934AB5DB}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{5FF09D76-A446-4971-8690-AF5A934AB5DB}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{ECD4F660-F423-4162-8E94-FFAD7CAE4257}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{ECD4F660-F423-4162-8E94-FFAD7CAE4257}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{4B2EC5FE-7E13-436D-BE5E-1925BABE03AD}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{4B2EC5FE-7E13-436D-BE5E-1925BABE03AD}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{7EFD9063-7221-431C-931F-644A9B8005CD}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{7EFD9063-7221-431C-931F-644A9B8005CD}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{58A79808-459F-4EC4-987A-57CDFA352307}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{58A79808-459F-4EC4-987A-57CDFA352307}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{8F174739-8946-41B4-B86B-09DD92E2FD3B}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{8F174739-8946-41B4-B86B-09DD92E2FD3B}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{EF76A3EC-F1F4-4926-8598-387C0899F063}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{EF76A3EC-F1F4-4926-8598-387C0899F063}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{B592F95D-5E15-4F53-A33B-1453BA85EBDA}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{B592F95D-5E15-4F53-A33B-1453BA85EBDA}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{92606BC5-6510-4331-8127-11FF61B0602B}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{92606BC5-6510-4331-8127-11FF61B0602B}.Debug|Any CPU.Build.0 = Debug|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

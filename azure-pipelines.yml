@@ -21,6 +21,7 @@ jobs:
       dotnet test test/MorseL.Sockets.Tests --logger trx
       dotnet test test/MorseL.Tests --logger trx
     displayName: 'Run automated tests'
+    continueOnError: true
 
   - task: PublishTestResults@2
     inputs:
@@ -54,6 +55,7 @@ jobs:
       dotnet test test/MorseL.Sockets.Tests --logger trx
       dotnet test test/MorseL.Tests --logger trx
     displayName: 'Run automated tests'
+    continueOnError: true
 
   - task: PublishTestResults@2
     inputs:
@@ -89,6 +91,7 @@ jobs:
       dotnet test test/MorseL.Sockets.Tests --logger trx
       dotnet test test/MorseL.Tests --logger trx
     displayName: 'Run automated tests'
+    continueOnError: true
 
   - task: PublishTestResults@2
     inputs:

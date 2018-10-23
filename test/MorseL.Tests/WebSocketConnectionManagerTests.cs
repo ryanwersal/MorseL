@@ -1,3 +1,4 @@
+using System;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using MorseL.Shared.Tests;
@@ -94,12 +95,10 @@ namespace MorseL.Tests
 
         public class AddSocket : WebSocketConnectionManagerTests
         {
-            [Fact(Skip = "At the moment the implementation allows adding null references")]
-            public void WhenNull_ShouldNotNotContainSocket()
+            [Fact]
+            public void AddingNullSocket_ThrowsArgumentNullException()
             {
-                _manager.AddConnection(null);
-
-                Assert.Equal(0, _manager.GetAll().Count);
+                Assert.Throws<ArgumentNullException>(() => _manager.AddConnection(null));
             }
 
             [Fact]
@@ -114,7 +113,7 @@ namespace MorseL.Tests
 
         public class RemoveSocket : WebSocketConnectionManagerTests
         {
-            [Theory(Skip = "Currently it doesn't check if the socket was removed or not, so we get an NRE")]
+            [Theory]
             [InlineData(null)]
             [InlineData("")]
             [InlineData("foo")]
