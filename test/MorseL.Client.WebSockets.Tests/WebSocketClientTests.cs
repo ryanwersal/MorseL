@@ -34,13 +34,14 @@ namespace MorseL.Client.WebSockets.Tests
             await Assert.ThrowsAsync<WebSocketClientException>(() => client.CloseAsync());
         }
 
-        [Fact(Skip = "This test fails on Linux/macOS but appears to succeed in Visual Studio's test runner?")]
-        public async Task DisconnectingConnectingClientDoesNotThrowException()
+        [Fact]
+        public async Task DisconnectingConnectingClientThrowsWebSocketClientException()
         {
             var client = new WebSocketClient(HostUri);
             var connectTask = client.ConnectAsync();
             await Task.WhenAny(connectTask, Task.Delay(TimeSpan.FromSeconds(1)));
-            await client.CloseAsync();
+
+            await Assert.ThrowsAsync<WebSocketClientException>(() => client.CloseAsync());
         }
 
         [Fact]

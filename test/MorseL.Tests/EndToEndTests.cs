@@ -191,7 +191,7 @@ namespace MorseL.Tests
             }
         }
 
-        [Theory(Skip = "Flaky on Linux and macOS. Seems reliable on Windows.")]
+        [Theory]
         [InlineData("SomeNonExistentMethod", "SomeMethodArgument")]
         [InlineData("SomeOtherNonExistentMethod", 5)]
         public async void HubInvokingNonExistentClientMethodThrowsInHubWithMiddleware(string methodName, params object[] arguments)
@@ -268,7 +268,7 @@ namespace MorseL.Tests
             }
         }
 
-        [Fact(Skip = "Flaky on Linux")]
+        [Fact]
         public async void ServerClosingConnectionDuringLongSendFromClientThrowsExceptionOnInvoker()
         {
             using (var server = new SimpleMorseLServer<TestHub>(IPAddress.Any, 5000).Start())

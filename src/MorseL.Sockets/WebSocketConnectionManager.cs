@@ -36,6 +36,8 @@ namespace MorseL.Sockets
 
         public Connection AddConnection(IChannel channel)
         {
+            if (channel == null) throw new ArgumentNullException(nameof(channel));
+
             var connection = new Connection(CreateConnectionId(), channel);
             _connections.TryAdd(connection.Id, connection);
             return connection;
@@ -48,7 +50,11 @@ namespace MorseL.Sockets
 
         public async Task RemoveConnection(string id)
         {
+            if (id == null) return;
+
             _connections.TryRemove(id, out var connection);
+            if (connection == null) return;
+
             await connection.DisposeAsync();
             connection = null;
         }

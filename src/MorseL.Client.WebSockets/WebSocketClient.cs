@@ -252,7 +252,7 @@ namespace MorseL.Client.WebSockets
                         // We eat this exception if we're being closed and throw a WebSocketClosed exception
                         if (_internalCts.IsCancellationRequested)
                         {
-                            throw new WebSocketClosedException($"WebSocket is closing");
+                            throw new WebSocketClosedException("WebSocket is closing");
                         }
                     }
 
