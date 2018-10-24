@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
@@ -48,6 +48,14 @@ namespace MorseL.Scaleout
                     await Unsubscribe(group, connectionId);
                 }
             }
+        }
+
+        public async Task DisconnectClientAsync(string connectionId)
+        {
+            await SendMessageAsync(connectionId, new Message
+            {
+                MessageType = MessageType.Disconnect
+            });
         }
 
         public async Task SendMessageAllAsync(Message message)

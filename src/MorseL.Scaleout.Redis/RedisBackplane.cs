@@ -118,6 +118,14 @@ namespace MorseL.Scaleout.Redis
             }
         }
 
+        public async Task DisconnectClientAsync(string connectionId)
+        {
+            await SendMessageAsync(connectionId, new Message
+            {
+                MessageType = MessageType.Disconnect
+            });
+        }
+
         public async Task SendMessageAsync(string connectionId, Message message)
         {
             var subscriber = Cache.Multiplexer.GetSubscriber();

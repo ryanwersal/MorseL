@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -19,8 +19,6 @@ namespace MorseL.Scaleout.Tests
 {
     public class ScaleoutTests
     {
-        private int _nextId;
-
         [Fact]
         public async void ClientConnectCallsBackplaneOnClientConnected()
         {
@@ -68,6 +66,23 @@ namespace MorseL.Scaleout.Tests
             var exception = await Assert.ThrowsAnyAsync<NotImplementedException>(
                 () => actualHub.OnDisconnected(webSocket, null));
             Assert.Equal(nameof(TestBackplane.OnClientDisconnectedAsync), exception.Message);
+        }
+
+        [Fact]
+        public async Task SendingDisconnectClientAsync_DisconnectsClient()
+        {
+            var backplane = new DefaultBackplane();
+            var serviceProvider = CreateServiceProvider(o => {
+                o.AddSingleton<IBackplane>(backplane);
+            });
+            var actualHub = serviceProvider.GetRequiredService<HubWebSocketHandler<TestHub>>();
+            var webSocket = new LinkedFakeSocket();
+
+            var connection = await CreateHubConnectionFromSocket(actualHub, webSocket);
+
+            await backplane.DisconnectClientAsync(connection.Id);
+
+            Assert.True(webSocket.CloseCalled);
         }
 
         [Fact]
@@ -176,7 +191,8 @@ namespace MorseL.Scaleout.Tests
 
             Assert.NotNull(connectMessage);
             Assert.NotNull(connectMessage.Data);
-            Assert.NotNull(Guid.Parse(connectMessage.Data));
+            Assert.NotEqual(Guid.Empty, Guid.Parse(connectMessage.Data));
+
             return connection;
         }
 
@@ -204,14 +220,6 @@ namespace MorseL.Scaleout.Tests
             }
 
             return Json.Deserialize<Message>(serializedMessage);
-        }
-
-        private async Task<InvocationResultDescriptor> ReadInvocationResultFromSocket<TReturnType>(WebSocket socket)
-        {
-            var message = await ReadMessageFromSocketAsync(socket);
-            var pendingCalls = new Dictionary<string, InvocationRequest>();
-            pendingCalls.Add(_nextId.ToString(), new InvocationRequest(new CancellationToken(), typeof(TReturnType)));
-            return Json.DeserializeInvocationResultDescriptor(message.Data, pendingCalls);
         }
     }
 
