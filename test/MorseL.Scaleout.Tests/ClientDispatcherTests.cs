@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using MorseL.Common;
@@ -112,6 +112,11 @@ namespace MorseL.Scaleout.Tests
         public Task OnClientDisconnectedAsync(string connectionId)
         {
             return OnClientDisconnectedCallback(connectionId);
+        }
+
+        public Task DisconnectClientAsync(string connectionId)
+        {
+            throw new NotImplementedException(connectionId);
         }
 
         public Task SendMessageAllAsync(Message message)

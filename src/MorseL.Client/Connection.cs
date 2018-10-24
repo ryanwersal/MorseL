@@ -98,7 +98,7 @@ namespace MorseL.Client
 
         public async Task StartAsync(CancellationToken ct = default(CancellationToken))
         {
-            if (_hasStarted) throw new MorseLException("Cannot call StartAsync more than once.");
+            if (_hasStarted) throw new MorseLException($"Cannot call {nameof(StartAsync)} more than once.");
             _hasStarted = true;
 
             await Task.Run(async () =>

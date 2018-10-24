@@ -21,6 +21,8 @@ namespace MorseL.Shared.Tests
         public override WebSocketState State => WebSocketState.Open;
         public override string SubProtocol => "";
 
+        public bool CloseCalled { get; private set; } = false;
+
         private byte[] _buffer;
         private int _position = 0;
 
@@ -102,6 +104,7 @@ namespace MorseL.Shared.Tests
 
         public override Task CloseAsync(WebSocketCloseStatus closeStatus, string statusDescription, CancellationToken cancellationToken)
         {
+            CloseCalled = true;
             return Task.CompletedTask;
         }
     }

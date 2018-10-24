@@ -87,5 +87,36 @@ namespace MorseL.Scaleout.Redis.Tests
                 Assert.DoesNotContain(client.ConnectionId, backplane.Connections.Keys);
             }
         }
+
+        [Fact]
+        public async Task SendingDisconnectClientAsync_DisconnectsClient()
+        {
+            RedisBackplane backplane = null;
+            using (new SimpleMorseLServer<TestHub>(IPAddress.Any, 5000, (collection, builder) =>
+            {
+                collection.AddSingleton<IBackplane, RedisBackplane>();
+                collection.Configure<ConfigurationOptions>(options =>
+                {
+                    options.EndPoints.Add("localhost:6379");
+                });
+            }, (builder, provider) =>
+            {
+                backplane = (RedisBackplane)provider.GetRequiredService<IBackplane>();
+            }).Start())
+            {
+                var client = new Client.Connection("ws://localhost:5000/hub");
+                await client.StartAsync();
+
+                await Task.Delay(2000);
+
+                Assert.True(client.IsConnected);
+                await backplane.DisconnectClientAsync(client.ConnectionId);
+
+                await Task.Delay(2000);
+
+                Assert.False(client.IsConnected);
+                Assert.DoesNotContain(client.ConnectionId, backplane.Connections.Keys);
+            }
+        }
     }
 }
