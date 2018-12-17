@@ -41,7 +41,7 @@ namespace MorseL.Client
     /// thrown upon the next <see cref="Invoke"/> call.
     /// </para>
     /// </summary>
-    public class Connection
+    public class Connection : IConnection
     {
         public string ConnectionId { get; set; }
 
