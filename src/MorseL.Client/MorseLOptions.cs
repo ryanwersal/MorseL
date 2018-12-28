@@ -52,5 +52,13 @@ namespace MorseL.Client
         /// </para>
         /// </summary>
         public bool ThrowOnInvalidRequest { get; set; } = true;
+
+        /// <summary>
+        /// <para>
+        /// The duration a connection attempt is given before canceled and treated as a failure due
+        /// to timeout.
+        /// </para>
+        /// </summary>
+        public TimeSpan ConnectionTimeout { get; set; } = TimeSpan.FromSeconds(30);
     }
 }

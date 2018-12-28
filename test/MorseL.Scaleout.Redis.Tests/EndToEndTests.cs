@@ -4,31 +4,54 @@ using System.Net;
 using System.Text;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using MorseL.Shared.Tests;
 using StackExchange.Redis;
 using Xunit;
+using Xunit.Abstractions;
 
 namespace MorseL.Scaleout.Redis.Tests
 {
-    public class EndToEndTests
+    public class Context
     {
+        public readonly PortPool PortPool = new PortPool(5100, 5150);
+    }
+
+    [Trait("Category", "Scaleout")]
+    public class EndToEndTests : IClassFixture<Context>
+    {
+        private const string REDIS_URI = "10.0.75.1:31002";
+
+        private readonly ITestOutputHelper _testOutputHelper;
+        private ILogger _logger;
+        private Context _context;
+
+        public EndToEndTests(Context context, ITestOutputHelper testOutputHelper)
+        {
+            _testOutputHelper = testOutputHelper;
+            _logger = new TestOutputHelperLogger(_testOutputHelper);
+            _context = context;
+        }
+
         [Fact]
         public async void ConnectionSubscriptionAddedOnConnect()
         {
             RedisBackplane backplane = null;
-            using (new SimpleMorseLServer<TestHub>(IPAddress.Any, 5000, (collection, builder) =>
+            using (var server = new SimpleMorseLServer<TestHub>((collection, builder) =>
             {
                 collection.AddSingleton<IBackplane, RedisBackplane>();
                 collection.Configure<ConfigurationOptions>(options =>
                 {
-                    options.EndPoints.Add("localhost:6379");
+                    options.EndPoints.Add(REDIS_URI);
                 });
             }, (builder, provider) =>
             {
                 backplane = (RedisBackplane) provider.GetRequiredService<IBackplane>();
-            }).Start())
+            }, logger: _logger))
             {
-                var client = new Client.Connection("ws://localhost:5000/hub");
+                await server.Start(_context.PortPool);
+
+                var client = new Client.Connection(server.Uri, logger: _logger);
                 await client.StartAsync();
                 await Task.Delay(250);
 
@@ -42,19 +65,21 @@ namespace MorseL.Scaleout.Redis.Tests
         public async void ConnectionSubscriptionRemovedOnNormalDisconnect()
         {
             RedisBackplane backplane = null;
-            using (new SimpleMorseLServer<TestHub>(IPAddress.Any, 5000, (collection, builder) =>
+            using (var server = new SimpleMorseLServer<TestHub>((collection, builder) =>
             {
                 collection.AddSingleton<IBackplane, RedisBackplane>();
                 collection.Configure<ConfigurationOptions>(options =>
                 {
-                    options.EndPoints.Add("localhost:6379");
+                    options.EndPoints.Add(REDIS_URI);
                 });
             }, (builder, provider) =>
             {
                 backplane = (RedisBackplane)provider.GetRequiredService<IBackplane>();
-            }).Start())
+            }, logger: _logger))
             {
-                var client = new Client.Connection("ws://localhost:5000/hub");
+                await server.Start(_context.PortPool);
+
+                var client = new Client.Connection(server.Uri, logger: _logger);
                 await client.StartAsync();
                 await client.DisposeAsync();
 
@@ -66,19 +91,21 @@ namespace MorseL.Scaleout.Redis.Tests
         public async void ConnectionSubscriptionRemovedOnAbnormalDisconnect()
         {
             RedisBackplane backplane = null;
-            using (new SimpleMorseLServer<TestHub>(IPAddress.Any, 5000, (collection, builder) =>
+            using (var server = new SimpleMorseLServer<TestHub>((collection, builder) =>
             {
                 collection.AddSingleton<IBackplane, RedisBackplane>();
                 collection.Configure<ConfigurationOptions>(options =>
                 {
-                    options.EndPoints.Add("localhost:6379");
+                    options.EndPoints.Add(REDIS_URI);
                 });
             }, (builder, provider) =>
             {
                 backplane = (RedisBackplane)provider.GetRequiredService<IBackplane>();
-            }).Start())
+            }, logger: _logger))
             {
-                var client = new Client.Connection("ws://localhost:5000/hub");
+                await server.Start(_context.PortPool);
+
+                var client = new Client.Connection(server.Uri, logger: _logger);
                 await client.StartAsync();
                 client.KillConnection();
 
@@ -92,19 +119,21 @@ namespace MorseL.Scaleout.Redis.Tests
         public async Task SendingDisconnectClientAsync_DisconnectsClient()
         {
             RedisBackplane backplane = null;
-            using (new SimpleMorseLServer<TestHub>(IPAddress.Any, 5000, (collection, builder) =>
+            using (var server = new SimpleMorseLServer<TestHub>((collection, builder) =>
             {
                 collection.AddSingleton<IBackplane, RedisBackplane>();
                 collection.Configure<ConfigurationOptions>(options =>
                 {
-                    options.EndPoints.Add("localhost:6379");
+                    options.EndPoints.Add(REDIS_URI);
                 });
             }, (builder, provider) =>
             {
                 backplane = (RedisBackplane)provider.GetRequiredService<IBackplane>();
-            }).Start())
+            }, logger: _logger))
             {
-                var client = new Client.Connection("ws://localhost:5000/hub");
+                await server.Start(_context.PortPool);
+
+                var client = new Client.Connection(server.Uri, logger: _logger);
                 await client.StartAsync();
 
                 await Task.Delay(2000);

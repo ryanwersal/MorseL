@@ -13,6 +13,7 @@ using System.Threading;
 
 namespace MorseL.Sockets.Test
 {
+    [Trait("Category", "Middleware")]
     public class MorseLHttpMiddlewareTests
     {
         private readonly ServicesMocker Mocker = new ServicesMocker();

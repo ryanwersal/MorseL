@@ -29,7 +29,7 @@ namespace MorseL.Sockets.Test
             });
 
             var encodedMessage = await socket.ReadToEndAsync();
-            var message = Json.Deserialize<Message>(Encoding.UTF8.GetString(Convert.FromBase64String(encodedMessage)));
+            var message = MessageSerializer.Deserialize<Message>(Encoding.UTF8.GetString(Convert.FromBase64String(encodedMessage)));
 
             Assert.Equal(message.Data, text);
         }

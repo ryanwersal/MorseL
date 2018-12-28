@@ -28,7 +28,7 @@ namespace MorseL
                     var message = new Message()
                     {
                         MessageType = MessageType.ClientMethodInvocation,
-                        Data = Json.SerializeObject(new InvocationDescriptor()
+                        Data = MessageSerializer.SerializeObject(new InvocationDescriptor()
                         {
                             MethodName = methodName,
                             Arguments = args
@@ -62,7 +62,7 @@ namespace MorseL
                         var message = new Message()
                         {
                             MessageType = MessageType.ClientMethodInvocation,
-                            Data = Json.SerializeObject(new InvocationDescriptor()
+                            Data = MessageSerializer.SerializeObject(new InvocationDescriptor()
                             {
                                 MethodName = methodName,
                                 Arguments = args

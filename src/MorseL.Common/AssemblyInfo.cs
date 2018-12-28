@@ -12,3 +12,4 @@ using System.Text;
 [assembly: InternalsVisibleTo("MorseL.Tests")]
 [assembly: InternalsVisibleTo("MorseL.Scaleout.Tests")]
 [assembly: InternalsVisibleTo("MorseL.Scaleout.Redis.Tests")]
+[assembly: InternalsVisibleTo("MorseL.Transmission.Tests")]
