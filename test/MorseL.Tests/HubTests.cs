@@ -240,7 +240,7 @@ namespace MorseL.Tests
 
         private async Task SendMessageToSocketAsync(WebSocketHandler handler, Connection connection, string methodName, params object[] args)
         {
-            var serializedMessage = Json.SerializeObject(new InvocationDescriptor()
+            var serializedMessage = MessageSerializer.SerializeObject(new InvocationDescriptor()
             {
                 Id = Interlocked.Increment(ref _nextId).ToString(),
                 MethodName = methodName,
@@ -277,7 +277,7 @@ namespace MorseL.Tests
                 }
             }
 
-            return Json.Deserialize<Message>(serializedMessage);
+            return MessageSerializer.Deserialize<Message>(serializedMessage);
         }
 
         private async Task<InvocationResultDescriptor> ReadInvocationResultFromSocket<TReturnType>(WebSocket socket)
@@ -285,7 +285,7 @@ namespace MorseL.Tests
             var message = await ReadMessageFromSocketAsync(socket);
             var pendingCalls = new Dictionary<string, InvocationRequest>();
             pendingCalls.Add(_nextId.ToString(), new InvocationRequest(new CancellationToken(), typeof(TReturnType)));
-            return Json.DeserializeInvocationResultDescriptor(message.Data, pendingCalls);
+            return MessageSerializer.DeserializeInvocationResultDescriptor(message.Data, pendingCalls);
         }
 
         private IServiceProvider CreateServiceProvider(Action<ServiceCollection> addServices = null)

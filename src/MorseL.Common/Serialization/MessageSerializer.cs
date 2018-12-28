@@ -3,12 +3,14 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Reflection;
+using System.Text;
+using System.Threading.Tasks;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 
 namespace MorseL.Common.Serialization
 {
-    internal static class Json
+    internal static class MessageSerializer
     {
         private static readonly JsonSerializer _serializer = new JsonSerializer();
         private static readonly MorseLJsonSerializerSettings _settings = new MorseLJsonSerializerSettings();
@@ -16,6 +18,17 @@ namespace MorseL.Common.Serialization
         public static T Deserialize<T>(string jsonString)
         {
             return JsonConvert.DeserializeObject<T>(jsonString, _settings);
+        }
+
+        public static async Task<T> DeserializeAsync<T>(Stream stream, Encoding encoding)
+        {
+            using (var internalStreamReader = new StreamReader(stream))
+            {
+                using (var jsonReader = new JsonTextReader(internalStreamReader))
+                {
+                    return (await JObject.ReadFromAsync(jsonReader)).ToObject<T>();
+                }
+            }
         }
 
         public static InvocationDescriptor DeserializeInvocationDescriptor(
@@ -114,6 +127,19 @@ namespace MorseL.Common.Serialization
         public static string SerializeObject<T>(T obj)
         {
             return JsonConvert.SerializeObject(obj, _settings);
+        }
+
+        public static async Task WriteObjectToStreamAsync<T>(Stream stream, T obj, bool leaveOpen = false)
+        {
+            using (var streamWriter = new StreamWriter(stream, Encoding.UTF8, 8192, leaveOpen))
+            {
+                using (var jsonWriter = new JsonTextWriter(streamWriter))
+                {
+                    // TODO :'(
+                    // https://github.com/JamesNK/Newtonsoft.Json/issues/1795
+                    await Task.Run(() => _serializer.Serialize(jsonWriter, obj));
+                }
+            }
         }
     }
 }

@@ -93,7 +93,7 @@ namespace MorseL.Shared.Tests
 
         public async Task<Message> ReadMessageAsync()
         {
-            return Json.Deserialize<Message>(await ReadToEndAsync());
+            return MessageSerializer.Deserialize<Message>(await ReadToEndAsync());
         }
 
         public override Task CloseOutputAsync(WebSocketCloseStatus closeStatus, string statusDescription,

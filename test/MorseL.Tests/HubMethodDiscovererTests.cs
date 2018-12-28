@@ -5,6 +5,7 @@ using Xunit;
 
 namespace MorseL.Tests
 {
+    [Trait("Category", "Hub")]
     public class HubMethodDiscovererTests
     {
         private readonly ServicesMocker Mocker = new ServicesMocker();

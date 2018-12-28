@@ -15,7 +15,7 @@ namespace MorseL.Sockets
             if (channel.State != ChannelState.Open) return;
 
             // TODO: Serializer settings? Usage is inconsistent in the entire solution.
-            var serializedMessage = Json.SerializeObject(message);
+            var serializedMessage = MessageSerializer.SerializeObject(message);
             var bytes = Encoding.ASCII.GetBytes(serializedMessage);
 
             using (var stream = new MemoryStream(bytes))

@@ -60,15 +60,11 @@ namespace Client
                 $"{_protocol}://{_host}:{_port}/hub",
                 _name,
                 option => { },
-                option => { },
                 option =>
                 {
                     if (_useSsl)
                     {
-                        option.Certificates = new X509Certificate2Collection(_clientCertificate);
-                        option.AllowNameMismatchCertificate = true;
-                        option.AllowUnstrustedCertificate = true;
-                        option.EnabledSslProtocols = SslProtocols.Tls | SslProtocols.Tls11 | SslProtocols.Tls12;
+                        option.RemoteCertificateValidationCallback = new System.Net.Security.RemoteCertificateValidationCallback((sender, cert, chain, policyErrors) => true);
                     }
                 });
         }
