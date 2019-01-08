@@ -6,6 +6,7 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <PackageReference Include="Bogus" Version="25.0.2" />
     <PackageReference Include="Microsoft.AspNetCore.All" Version="2.0.0" />
     <PackageReference Include="Microsoft.Extensions.CommandLineUtils" Version="1.1.1" />
     <PackageReference Include="Serilog.Extensions.Logging" Version="1.4.0" />
@@ -13,6 +14,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\..\..\src\MorseL.Scaleout.Redis\MorseL.Scaleout.Redis.csproj" />
     <ProjectReference Include="..\..\..\src\MorseL\MorseL.csproj" />
   </ItemGroup>
 

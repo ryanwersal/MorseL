@@ -1,5 +1,4 @@
 ﻿using System;
-using System.Diagnostics;
 using Microsoft.Extensions.CommandLineUtils;
 using Serilog;
 
@@ -11,12 +10,13 @@ namespace Client
         {
             var app = new CommandLineApplication();
             app.Name = "MorseL Stress Test Conductor";
+            app.HelpOption("-?|-h|--help");
             var name = app.Option("-n|--name", "The name of the client.", CommandOptionType.SingleValue, false);
             var host = app.Option("-H|--host", "The host address to bind to.", CommandOptionType.SingleValue, false);
             var port = app.Option("-p|--port", "The host port to bind to.", CommandOptionType.SingleValue, false);
             var ssl = app.Option("-S|--use-ssl", "Use WSS protocol", CommandOptionType.SingleValue, false);
             var clientCert = app.Option("--client-certificate", "A client certificate to use", CommandOptionType.SingleValue, false);
-            var clientCertPassphrase = app.Option("--client-certificate-passphrae", "A client certificate passphrase to use", CommandOptionType.SingleValue, false);
+            var clientCertPassphrase = app.Option("--client-certificate-passphrase", "A client certificate passphrase to use", CommandOptionType.SingleValue, false);
 
             app.OnExecute(async () =>
             {

@@ -7,10 +7,12 @@ namespace Orchestrator
     {
         static void Main(string[] args)
         {
-            var app = new CommandLineApplication();
-            app.Name = "MorseL Stress Test Conductor";
+            var app = new CommandLineApplication
+            {
+                Name = "MorseL Stress Test Conductor"
+            };
             app.HelpOption("-?|-h|--help");
-            var clients = app.Option("--clients", "Number of connections to establish", CommandOptionType.SingleValue, false);
+            var clients = app.Option("--clients", "Number of client processes to create", CommandOptionType.SingleValue, false);
 
             app.OnExecute(async () =>
             {
@@ -19,7 +21,11 @@ namespace Orchestrator
                     .WriteTo.ColoredConsole()
                     .CreateLogger();
 
-                await new Conductor.Conductor(int.Parse(clients.Value())).StartAsync();
+                using (var conductor = new Conductor.Conductor(int.Parse(clients.Value())))
+                {
+                    await conductor.StartAsync();
+                }
+
                 return 0;
             });
 

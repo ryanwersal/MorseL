@@ -14,9 +14,10 @@ namespace Host
         {
             var app = new CommandLineApplication();
             app.Name = "MorseL Stress Test Host";
-            var host = app.Option("-H|--host", "The host address to bind to.", CommandOptionType.SingleValue, false);
-            var port = app.Option("-p|--port", "The host port to bind to.", CommandOptionType.SingleValue, false);
-            var securePort = app.Option("-P|--secure-port", "The host port to bind to.", CommandOptionType.SingleValue, false);
+            app.HelpOption("-?|-h|--help");
+            var host = app.Option("-H|--host", "The host address to bind to. Defaults to 127.0.0.1.", CommandOptionType.SingleValue, false);
+            var port = app.Option("-p|--port", "The host port to bind to. Defaults to 5000.", CommandOptionType.SingleValue, false);
+            var securePort = app.Option("-P|--secure-port", "The host port to bind to. Defaults to 5001.", CommandOptionType.SingleValue, false);
 
             app.OnExecute(() =>
             {
@@ -39,7 +40,7 @@ namespace Host
                                 {
                                     ServerCertificate = new X509Certificate2("server.pfx"),
                                     ClientCertificateMode = ClientCertificateMode.AllowCertificate,
-                                    SslProtocols = SslProtocols.Tls | SslProtocols.Tls11,
+                                    SslProtocols = SslProtocols.Tls | SslProtocols.Tls11 | SslProtocols.Tls12,
                                     CheckCertificateRevocation = false,
                                     ClientCertificateValidation = (certificate2, chain, arg3) => true
                                 });

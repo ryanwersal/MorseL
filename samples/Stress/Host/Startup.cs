@@ -5,7 +5,10 @@ using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using MorseL.Extensions;
+using MorseL.Scaleout;
+using MorseL.Scaleout.Redis;
 using Serilog;
+using StackExchange.Redis;
 
 namespace Host
 {
@@ -13,7 +16,6 @@ namespace Host
     {
         public Startup(IHostingEnvironment env)
         {
-            // Configure the Serilog pipeline
             Log.Logger = new LoggerConfiguration()
                 .MinimumLevel.Debug()
                 .Enrich.FromLogContext()
@@ -23,10 +25,6 @@ namespace Host
 
         public void Configure(IApplicationBuilder app, IServiceProvider serviceProvider, ILoggerFactory loggerFactory)
         {
-//            loggerFactory
-//                .AddConsole()
-//                .AddSerilog();
-
             app.UseWebSockets();
             app.MapMorseLHub<HostHub>("/hub");
 
@@ -36,6 +34,13 @@ namespace Host
         public void ConfigureServices(IServiceCollection services)
         {
             services.AddMorseL();
+
+            services.AddSingleton<IBackplane, RedisBackplane>();
+            services.Configure<ConfigurationOptions>(o =>
+            {
+                o.EndPoints.Add("localhost:6379");
+            });
+
             services.AddSingleton(Log.Logger);
         }
     }

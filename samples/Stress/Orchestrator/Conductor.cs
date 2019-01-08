@@ -1,7 +1,5 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Diagnostics;
-using System.Text;
 using System.Threading.Tasks;
 using Orchestrator;
 using Serilog;
@@ -27,7 +25,7 @@ namespace Conductor
             _host = new Host();
             await _host.StartAsync();
 
-            await Task.Delay(2000);
+            await Task.Delay(TimeSpan.FromSeconds(10));
 
             Log.Information($"Starting MorseL {_clientCount} clients");
             for (var i = 0; i < _clientCount; i++)

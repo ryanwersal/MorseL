@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Diagnostics;
+using System.IO;
 using System.Threading.Tasks;
 
 namespace Orchestrator
@@ -20,11 +21,8 @@ namespace Orchestrator
             {
                 CreateNoWindow = false,
                 FileName = "dotnet",
-                Arguments = $"Client.dll --name=\"{_name}\" --host=localhost --port=5000",
-                WorkingDirectory = "../Client/bin/Debug/netcoreapp1.1/",
-//                RedirectStandardError = true,
-//                RedirectStandardInput = true,
-//                RedirectStandardOutput = true
+                Arguments = $"Client.dll --name=\"{_name}\" --host=127.0.0.1 --port=5000",
+                WorkingDirectory = Path.GetFullPath("../../../../Client/bin/Debug/netcoreapp2.1/"),
             };
             _process = new Process { StartInfo = startInfo };
             _process.Start();
