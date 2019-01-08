@@ -1,12 +1,10 @@
 ﻿using System;
-using System.Collections.Generic;
 using System.Linq;
-using System.Runtime.CompilerServices;
 using System.Security.Authentication;
 using System.Security.Cryptography.X509Certificates;
-using System.Text;
 using System.Threading.Tasks;
-using Client.Helper;
+using Bogus;
+using ByteSizeLib;
 using MorseL.Client;
 using Serilog;
 
@@ -14,7 +12,7 @@ namespace Client
 {
     public class Client : IDisposable
     {
-        private Connection _connection;
+        private IConnection _connection;
         private readonly string _name;
         private readonly string _host;
         private readonly int _port;
@@ -22,7 +20,10 @@ namespace Client
         private readonly bool _useSsl;
         private readonly X509Certificate2 _clientCertificate;
 
-        private static readonly Random Random = new Random((int) DateTime.Now.Ticks);
+        private static readonly Faker Faker = new Faker();
+
+        private static readonly TimeSpan MaxExpectResponseDelay = TimeSpan.FromSeconds(10);
+        private static readonly TimeSpan MaxParallelExpectResponseDelay = TimeSpan.FromSeconds(1);
 
         public Client(string name, string host, int port, bool useSsl, string clientCert, string clientCertPassphrase)
         {
@@ -36,19 +37,33 @@ namespace Client
 
         public async Task StartAsync()
         {
-            await Task.Delay(1000);
-
-            CreateConnection();
-
-            await _connection.StartAsync();
+            while (!(_connection?.IsConnected ?? false))
+            {
+                try
+                {
+                    CreateConnection();
+                    await _connection.StartAsync();
+                }
+                catch (Exception ex)
+                {
+                    Log.Error(ex, "Unable to connect. Retrying...");
+                    await Task.Delay(TimeSpan.FromSeconds(2));
+                }
+            }
 
             await _connection.Invoke<object>("Hello", _name);
 
-            var random = new Random();
+            var actions = new Func<string, IConnection, Task>[]
+            {
+                Ping,
+                Respond,
+                ExpectResponse,
+                ExpectResponseParallel,
+            };
 
             while (true)
             {
-                await Actions[Random.Next(0, Actions.Length)](_name, _connection);
+                await Faker.PickRandom(actions).Invoke(_name, _connection);
             }
         }
 
@@ -59,18 +74,44 @@ namespace Client
             _connection = new Connection(
                 $"{_protocol}://{_host}:{_port}/hub",
                 _name,
-                option => { },
-                option => { },
-                option =>
+                morselOptions => { },
+                socketOptions => { },
+                securityOptions =>
                 {
                     if (_useSsl)
                     {
-                        option.Certificates = new X509Certificate2Collection(_clientCertificate);
-                        option.AllowNameMismatchCertificate = true;
-                        option.AllowUnstrustedCertificate = true;
-                        option.EnabledSslProtocols = SslProtocols.Tls | SslProtocols.Tls11 | SslProtocols.Tls12;
+                        securityOptions.Certificates = new X509Certificate2Collection(_clientCertificate);
+                        // NOTE: Don't actually enable these in production code - this is done for the sake of
+                        // using self signed certificates in a demo/sample.
+                        securityOptions.AllowNameMismatchCertificate = true;
+                        securityOptions.AllowUnstrustedCertificate = true;
+                        securityOptions.EnabledSslProtocols = SslProtocols.Tls | SslProtocols.Tls11 | SslProtocols.Tls12;
                     }
                 });
+            
+            for (var i = 0; i < 10; ++i)
+            {
+                RegisterLoremHandler(i, _connection);
+            }
+        }
+
+        private static DateTimeOffset RespondStartTime;
+
+        private static void RegisterLoremHandler(int num, IConnection connection)
+        {
+            var name = $"Lorem-{num}";
+            connection.On<int, string>(name, (index, data) =>
+            {
+                var bytes = data.Length * sizeof(char);
+                Log.Debug("Received {Function} for {Index} of {Size}", name, index, ByteSize.FromBytes(bytes).ToString());
+
+                if (index == 999)
+                {
+                    var endTime = DateTimeOffset.UtcNow;
+                    var duration = endTime - RespondStartTime;
+                    Log.Information("{Function} finished at {EndTime} ({Duration})", nameof(Respond), endTime, duration);
+                }
+            });
         }
 
         public void Dispose()
@@ -79,34 +120,59 @@ namespace Client
             _connection.DisposeAsync().Wait();
         }
 
-        private readonly Func<string, Connection, Task>[] Actions =
+        private static async Task Ping(string name, IConnection connection)
         {
-            async (name, connection) =>
+            Log.Information("Invoking {Function}", nameof(Ping));
+            await connection.Invoke<object>(nameof(Ping));
+        }
+
+        private static Task Respond(string name, IConnection connection)
+        {
+            Log.Information("Invoking {Function}", nameof(Respond));
+
+            var messageCount = Faker.Random.Int(100, 300);
+            var paragraphCount = Faker.Random.Int(25, 250);
+
+            RespondStartTime = DateTimeOffset.UtcNow;
+
+            // Don't wait for completion. Send and we will get invoked by the server.
+            var _ = connection.Invoke(nameof(Respond), messageCount, paragraphCount);
+
+            Log.Information("{Function} started at {StartTime}", nameof(Respond), RespondStartTime);
+
+            return Task.CompletedTask;
+        }
+
+        private static async Task ExpectResponse(string name, IConnection connection)
+        {
+            var input = Faker.Lorem.Paragraphs();
+            Log.Information("Requesting {Function} of {Length} characters.", nameof(ExpectResponse), input.Length);
+
+            var delay = Faker.Date.Timespan(MaxExpectResponseDelay);
+            if (!input.Equals(await connection.Invoke<string>(nameof(ExpectResponse), "single", input, delay.TotalMilliseconds)))
             {
-                Log.Information("Invoking Ping");
-                await connection.Invoke<object>("Ping");
-            },
-            async (name, connection) =>
-            {
-                var input = LoremIpsum.Generate(1, 1000, 1, 100, 1);
-                Log.Information($"Requesting LoremIpsum of {input.Length} characters.");
-                if (!input.Equals(await connection.Invoke<string>("ExpectResponse", "single", input, Random.Next(0, 10000))))
-                {
-                    Log.Error("ExpectResponse failed");
-                }
-            },
-            async (name, connection) =>
-            {
-                var parallelCount = Random.Next(2, 10);
-                var inputs = Enumerable.Range(0, parallelCount).Select(i => LoremIpsum.Generate(1, 1000, 1, 100, 1)).ToArray();
-                Log.Information($"Requesting {parallelCount} parallel LoremIpsum requests.");
-                var tasks = inputs.Select((s, i) => connection.Invoke<string>("ExpectResponse", $"{i + 1}/{parallelCount}", s, Random.Next(0, 1000)));
-                var result = await Task.WhenAll(tasks);
-                if (result.Where((s, i) => !inputs[i].Equals(s)).Any())
-                {
-                    Log.Error("Parallel ExpectResponse failed");
-                }
+                Log.Error("{Function} failed", nameof(ExpectResponse));
             }
-        };
+        }
+
+        private static async Task ExpectResponseParallel(string name, IConnection connection)
+        {
+            var parallelCount = Faker.Random.Int(2, 10);
+            var inputs = Enumerable.Range(0, parallelCount).Select(i => Faker.Lorem.Paragraphs()).ToArray();
+            Log.Information("Requesting {ParallelCount} parallel {Function} requests.", parallelCount, nameof(ExpectResponse));
+
+            var tasks = inputs.Select((s, i) =>
+                connection.Invoke<string>(
+                    nameof(ExpectResponse),
+                    $"{i + 1}/{parallelCount}",
+                    s,
+                    Faker.Date.Timespan(MaxParallelExpectResponseDelay).TotalMilliseconds));
+
+            var result = await Task.WhenAll(tasks);
+            if (result.Where((s, i) => !inputs[i].Equals(s)).Any())
+            {
+                Log.Error("{Function} failed", nameof(ExpectResponseParallel));
+            }
+        }
     }
 }
