@@ -22,7 +22,7 @@ namespace MorseL.Scaleout.Redis.Tests
     [Trait("Category", "Scaleout")]
     public class RedisBackplaneTests
     {
-        private const string REDIS_URI = "10.0.75.1:31002";
+        private const string REDIS_URI = "localhost:6379";
         private int _nextId;
 
         [Fact]

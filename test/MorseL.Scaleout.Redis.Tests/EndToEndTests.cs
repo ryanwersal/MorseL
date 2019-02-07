@@ -20,7 +20,7 @@ namespace MorseL.Scaleout.Redis.Tests
     [Trait("Category", "Scaleout")]
     public class EndToEndTests : IClassFixture<Context>
     {
-        private const string REDIS_URI = "10.0.75.1:31002";
+        private const string REDIS_URI = "localhost:6379";
 
         private readonly ITestOutputHelper _testOutputHelper;
         private ILogger _logger;
