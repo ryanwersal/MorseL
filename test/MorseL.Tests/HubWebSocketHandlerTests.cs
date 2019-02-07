@@ -7,6 +7,7 @@ using MorseL.Shared.Tests;
 
 namespace MorseL.Tests
 {
+    [Trait("Category", "Hub")]
     public class HubWebSocketHandlerTests
     {
         public class DefaultHub : Hub<IClientInvoker>

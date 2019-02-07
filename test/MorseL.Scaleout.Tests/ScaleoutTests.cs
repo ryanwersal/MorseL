@@ -17,6 +17,7 @@ using Xunit;
 
 namespace MorseL.Scaleout.Tests
 {
+    [Trait("Category", "Scaleout")]
     public class ScaleoutTests
     {
         [Fact]
@@ -219,7 +220,7 @@ namespace MorseL.Scaleout.Tests
                 }
             }
 
-            return Json.Deserialize<Message>(serializedMessage);
+            return MessageSerializer.Deserialize<Message>(serializedMessage);
         }
     }
 

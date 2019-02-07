@@ -143,7 +143,7 @@ namespace MorseL
             InvocationDescriptor invocationDescriptor = null;
             try
             {
-                invocationDescriptor = Json.DeserializeInvocationDescriptor(serializedInvocationDescriptor, _hubMethodDiscoverer.GetAllMethodInfo());
+                invocationDescriptor = MessageSerializer.DeserializeInvocationDescriptor(serializedInvocationDescriptor, _hubMethodDiscoverer.GetAllMethodInfo());
             }
             catch (Exception)
             {
@@ -179,7 +179,7 @@ namespace MorseL
             var message = new Message
             {
                 MessageType = MessageType.InvocationResult,
-                Data = Json.SerializeObject(result)
+                Data = MessageSerializer.SerializeObject(result)
             };
 
             await connection.Channel.SendMessageAsync(message);
@@ -221,7 +221,7 @@ namespace MorseL
             return connection.Channel.SendMessageAsync(new Message()
             {
                 MessageType = MessageType.InvocationResult,
-                Data = Json.SerializeObject(new InvocationResultDescriptor
+                Data = MessageSerializer.SerializeObject(new InvocationResultDescriptor
                 {
                     Id = invocationId,
                     Error = $"Cannot find method \"{methodName}({argumentList})\""
@@ -235,7 +235,7 @@ namespace MorseL
             JObject invocationDescriptor = null;
             try
             {
-                invocationDescriptor = Json.Deserialize<JObject>(serializedInvocationDescriptor);
+                invocationDescriptor = MessageSerializer.Deserialize<JObject>(serializedInvocationDescriptor);
             }
             catch { }
 

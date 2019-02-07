@@ -9,6 +9,7 @@ using Xunit;
 
 namespace MorseL.Scaleout.Tests
 {
+    [Trait("Category", "Scaleout")]
     public class ClientDispatcherTests
     {
         [Theory]
@@ -42,7 +43,7 @@ namespace MorseL.Scaleout.Tests
 
             var exception = await Assert.ThrowsAnyAsync<NotImplementedException>(
                 () => clientDispatcher.All.InvokeAsync(methodName, arguments));
-            Assert.Equal(Json.SerializeObject<InvocationDescriptor>(new InvocationDescriptor {
+            Assert.Equal(MessageSerializer.SerializeObject<InvocationDescriptor>(new InvocationDescriptor {
                 MethodName = methodName,
                 Arguments = arguments
             }), exception.Message);
@@ -78,7 +79,7 @@ namespace MorseL.Scaleout.Tests
 
             var exception = await Assert.ThrowsAnyAsync<NotImplementedException>(
                 () => clientDispatcher.Client(connectionId).InvokeAsync(methodName, arguments));
-            Assert.Equal(connectionId + Json.SerializeObject<InvocationDescriptor>(new InvocationDescriptor {
+            Assert.Equal(connectionId + MessageSerializer.SerializeObject<InvocationDescriptor>(new InvocationDescriptor {
                 MethodName = methodName,
                 Arguments = arguments
             }), exception.Message);

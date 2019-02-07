@@ -1,12 +1,13 @@
 ﻿using System;
 using System.Diagnostics;
+using System.IO;
+using System.Security.Cryptography;
 using System.Security.Cryptography.X509Certificates;
 using System.Text;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using MorseL.Client;
 using MorseL.Client.Middleware;
-using MorseL.Client.WebSockets;
 
 public class Program
 {
@@ -42,18 +43,15 @@ public class Program
 
     public static async Task StartConnectionAsync()
     {
-        _connection = new Connection("ws://localhost:5000/chat", config: option =>
-        {
-            option.EnableAutoSendPing = true;
-            option.AutoSendPingIntervalSeconds = 5;
-        }, securityConfig: option =>
-        {
-            option.Certificates.Add(new X509Certificate2("client.pfx"));
-            option.AllowUnstrustedCertificate = true;
-            option.AllowNameMismatchCertificate = true;
-        }, logger: new LoggerFactory().AddConsole().CreateLogger<Program>());
+        _connection = new Connection("ws://localhost:5000/chat",
+            webSocketOptions: option =>
+            {
+                option.ClientCertificates = new X509CertificateCollection(new[] { new X509Certificate2("client.pfx") });
+                option.RemoteCertificateValidationCallback = new System.Net.Security.RemoteCertificateValidationCallback((sender, cert, chain, policyErrors) => true);
+            },
+            logger: new LoggerFactory().AddConsole().CreateLogger<Program>());
 
-        _connection.AddMiddleware(new Middleware());
+        _connection.AddMiddleware(new Base64ClientMiddleware());
 
         await _connection.StartAsync();
     }
@@ -74,18 +72,18 @@ public class Program
         Debug.WriteLine(result);
     }
 
-    private class Middleware : IMiddleware
+    public class Base64ClientMiddleware : IMiddleware
     {
-        public Task SendAsync(string data, TransmitDelegate next)
+        public async Task SendAsync(Stream stream, TransmitDelegate next)
         {
-            data = Convert.ToBase64String(Encoding.UTF8.GetBytes(data));
-            return next(data);
+            await next(new CryptoStream(stream, new ToBase64Transform(), CryptoStreamMode.Write));
         }
 
-        public Task RecieveAsync(WebSocketPacket packet, RecieveDelegate next)
+        public async Task RecieveAsync(ConnectionContext context, RecieveDelegate next)
         {
-            var data = Convert.FromBase64String(Encoding.UTF8.GetString(packet.Data));
-            return next(new WebSocketPacket(packet.MessageType, data));
+            await next(new ConnectionContext(
+                context.ClientWebSocket,
+                new CryptoStream(context.Stream, new FromBase64Transform(), CryptoStreamMode.Read)));
         }
     }
 }

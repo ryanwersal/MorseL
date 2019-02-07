@@ -1,22 +1,25 @@
 ﻿using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Diagnostics;
+using System.IO;
 using System.Linq;
+using System.Net.WebSockets;
 using System.Runtime.CompilerServices;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
-using MorseL.Client.WebSockets;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 using MorseL.Client.Middleware;
-using Nito.AsyncEx.Synchronous;
-using SuperSocket.ClientEngine;
 using MorseL.Common;
 using MorseL.Common.Serialization;
+using MorseL.Common.WebSocket.Extensions;
+using MorseL.Common.WebSockets.Exceptions;
 using MorseL.Diagnostics;
-using WebSocketMessageType = MorseL.Client.WebSockets.WebSocketMessageType;
-using WebSocketState = WebSocket4Net.WebSocketState;
+using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
+using Nito.AsyncEx.Synchronous;
 
 [assembly: InternalsVisibleTo("MorseL.Scaleout.Redis.Tests")]
 [assembly: InternalsVisibleTo("MorseL.Tests")]
@@ -45,17 +48,28 @@ namespace MorseL.Client
     {
         public string ConnectionId { get; set; }
 
-        private readonly WebSocketClient _clientWebSocket;
+        private readonly ClientWebSocket _clientWebSocket;
         private readonly string _name;
         private readonly ILogger _logger;
+
+        /// <summary>
+        /// Receiving is handled by a single async process spinning and reading
+        /// so we don't have to worry about stomping over the websocket with
+        /// receive requests. Writing, on the other hand, is hand-wavy concurrent,
+        /// and actually does need to make sure individual messages are sent
+        /// atomically.
+        /// </summary>
+        private readonly SemaphoreSlim _writeLock = new SemaphoreSlim(1, 1);
+
         private bool _hasStarted;
         private bool _isDisposed;
+        private bool _wasClosedInvoked;
 
         private readonly MorseLOptions _options = new MorseLOptions();
 
         private int _nextId = 0;
 
-        private readonly TaskCompletionSource<object> _taskCompletionSource = new TaskCompletionSource<object>(TaskCreationOptions.RunContinuationsAsynchronously);
+        private readonly TaskCompletionSource<object> _connectionCts = new TaskCompletionSource<object>();
         private volatile Task _receiveLoopTask;
 
         private readonly object _pendingCallsLock = new object();
@@ -68,18 +82,19 @@ namespace MorseL.Client
         public event Action<Exception> Closed;
         public event Action<Exception> Error;
 
+        private readonly string _uri;
         private readonly IList<Exception> _pendingExceptions = new List<Exception>();
 
         public bool IsConnected => _clientWebSocket.State == WebSocketState.Open;
 
-        public Connection(string uri, string name = null, Action<MorseLOptions> options = null, Action<WebSocketClientOption> config = null, Action<SecurityOption> securityConfig = null, ILogger logger = null)
+        public Connection(string uri, string name = null, Action<MorseLOptions> options = null, Action<ClientWebSocketOptions> webSocketOptions = null, ILogger logger = null)
         {
             _name = name;
-            _logger = logger;
+            _logger = logger ?? NullLogger.Instance;
+            _uri = uri;
             options?.Invoke(_options);
-            _clientWebSocket = new WebSocketClient(uri, config, securityConfig);
-            _clientWebSocket.Connected += () => Connected?.Invoke();
-            _clientWebSocket.Closed += () => Closed?.Invoke(null);
+            _clientWebSocket = new ClientWebSocket();
+            webSocketOptions?.Invoke(_clientWebSocket.Options);
 
             // Used to track exceptions and rethrow when able
             Error += (exception) =>
@@ -101,23 +116,37 @@ namespace MorseL.Client
             if (_hasStarted) throw new MorseLException($"Cannot call {nameof(StartAsync)} more than once.");
             _hasStarted = true;
 
+            ct.Register(() => _connectionCts.TrySetCanceled(ct));
+
             await Task.Run(async () =>
             {
-                await _clientWebSocket.ConnectAsync(ct).ConfigureAwait(false);
+                var stopwatch = new Stopwatch();
+                stopwatch.Start();
+                await _clientWebSocket.ConnectAsync(new Uri(_uri), ct).ConfigureAwait(false);
+                stopwatch.Stop();
 
-                _receiveLoopTask = Receive(async message =>
+                _logger.LogDebug($"Connection to {_uri} established after {stopwatch.Elapsed.ToString("mm\\:ss\\.ff")}");
+
+                _receiveLoopTask = Receive(async stream =>
                 {
+                    _logger.LogTrace($"Received message stream - beginning processing");
+                    var message = await MessageSerializer.DeserializeAsync<Message>(stream, Encoding.UTF8).ConfigureAwait(false);
+                    _logger.LogTrace($"Received \"{message}\"");
+
                     switch (message.MessageType)
                     {
                         case MessageType.ConnectionEvent:
+                            _connectionCts.TrySetResult(null);
+
                             ConnectionId = message.Data;
+                            Connected?.Invoke();
                             break;
 
                         case MessageType.ClientMethodInvocation:
                             InvocationDescriptor invocationDescriptor = null;
                             try
                             {
-                                invocationDescriptor = Json.DeserializeInvocationDescriptor(message.Data, _handlers);
+                                invocationDescriptor = MessageSerializer.DeserializeInvocationDescriptor(message.Data, _handlers);
                             }
                             catch (Exception exception)
                             {
@@ -139,28 +168,38 @@ namespace MorseL.Client
                             InvocationResultDescriptor resultDescriptor;
                             try
                             {
-                                resultDescriptor = Json.DeserializeInvocationResultDescriptor(message.Data, _pendingCalls);
+                                resultDescriptor = MessageSerializer.DeserializeInvocationResultDescriptor(message.Data, _pendingCalls);
                             }
                             catch (Exception exception)
                             {
-                                await HandleInvalidInvocationResultDescriptor(message.Data, exception);
+                                await HandleInvalidInvocationResultDescriptor(message.Data, exception).ConfigureAwait(false);
                                 return;
                             }
 
                             HandleInvokeResult(resultDescriptor);
                             break;
                         case MessageType.Error:
-                            await HandleErrorMessage(message);
+                            await HandleErrorMessage(message).ConfigureAwait(false);
                             break;
                     }
                 }, ct);
-                _receiveLoopTask.ContinueWith(task => {
+                _receiveLoopTask.ContinueWith(task =>
+                {
                     if (task.IsFaulted)
                     {
                         Error?.Invoke(task.Exception);
                     }
                 });
+
             }, ct).ConfigureAwait(false);
+
+            var timeoutTask = Task.Delay(_options.ConnectionTimeout);
+            await Task.WhenAny(_connectionCts.Task, timeoutTask).ConfigureAwait(false);
+
+            if (!ct.IsCancellationRequested && !_connectionCts.Task.IsCompleted && timeoutTask.IsCompleted)
+            {
+                throw new TimeoutException($"Connection attempt to {_uri} timed out after {_options.ConnectionTimeout}");
+            }
         }
 
         private Task HandleMissingReceivedInvocationDescriptor(JObject invocationDescriptor)
@@ -207,7 +246,7 @@ namespace MorseL.Client
             JObject invocationDescriptor = null;
             try
             {
-                invocationDescriptor = Json.Deserialize<JObject>(serializedInvocationDescriptor);
+                invocationDescriptor = MessageSerializer.Deserialize<JObject>(serializedInvocationDescriptor);
             }
             catch { }
 
@@ -302,8 +341,7 @@ namespace MorseL.Client
 
             try
             {
-                var message = Json.SerializeObject(descriptor);
-                await SendMessageAsync(message);
+                await SendMessageAsync(stream => MessageSerializer.WriteObjectToStreamAsync(stream, descriptor));
             }
             catch (Exception e)
             {
@@ -319,36 +357,54 @@ namespace MorseL.Client
 
         private async Task SendMessageAsync(string message)
         {
-            var transformIterator = _middleware.GetEnumerator();
+            var stringStream = new StringReader(message);
+            using (var memoryStream = new MemoryStream(Encoding.UTF8.GetBytes(message)))
+            {
+                await SendMessageAsync((stream) => memoryStream.CopyToAsync(stream));
+            }
+        }
+
+        private async Task SendMessageAsync(Func<Stream, Task> writer)
+        {
+            var transformIterator = ((IEnumerable<IMiddleware>)_middleware).Reverse().GetEnumerator();
             TransmitDelegate transformDelegator = null;
-            transformDelegator = async data =>
+            transformDelegator = async transformedStream =>
             {
                 if (transformIterator.MoveNext())
                 {
                     using (_logger?.Tracer($"Middleware[{transformIterator.Current.GetType()}].SendAsync(...)"))
                     {
-                        await transformIterator.Current.SendAsync(data, transformDelegator).ConfigureAwait(false);
+                        await transformIterator.Current.SendAsync(transformedStream, transformDelegator).ConfigureAwait(false);
                     }
                 }
                 else
                 {
-                    using (_logger?.Tracer("Connection.SendAsync(...)"))
-                    {
-                        await _clientWebSocket.SendAsync(data, CancellationToken.None).ConfigureAwait(false);
-                    }
+                    await writer(transformedStream).ConfigureAwait(false);
                 }
             };
-            await transformDelegator
-                .Invoke(message)
-                .ContinueWith(task =>
-                {
-                    // Dispose first before handling return state
-                    transformIterator.Dispose();
 
-                    // Unwrap and allow the outer exception handler to handle this case
-                    task.WaitAndUnwrapException();
-                })
-                .ConfigureAwait(false);
+            await _writeLock.WaitAsync();
+            try
+            {
+                using (var writeStream = _clientWebSocket.GetWriteStream())
+                {
+                    await transformDelegator
+                        .Invoke(writeStream)
+                        .ContinueWith(async task =>
+                        {
+                            // Dispose first before handling return state
+                            transformIterator.Dispose();
+
+                            // Unwrap and allow the outer exception handler to handle this case
+                            task.WaitAndUnwrapException();
+                        })
+                        .ConfigureAwait(false);
+                }
+            }
+            finally
+            {
+                _writeLock.Release();
+            }
         }
 
         private Task InvokeOn(InvocationDescriptor descriptor)
@@ -418,17 +474,24 @@ namespace MorseL.Client
 
         internal void KillConnection()
         {
-            _clientWebSocket.Dispose(false);
+            _clientWebSocket.Dispose();
         }
 
         public async Task DisposeAsync(CancellationToken ct = default(CancellationToken))
         {
+            // Stop any connection attempts
+            _connectionCts.TrySetCanceled();
+
             if (_isDisposed) throw new MorseLException("This connection has already been disposed.");
             _isDisposed = true;
 
-            if (_clientWebSocket.State != WebSocketState.Closed)
+            // These states were determined based on error messages thrown when sending
+            // CloseAsync in a bad state ¯\_(ツ)_/¯
+            if (_clientWebSocket.State == WebSocketState.Open
+                || _clientWebSocket.State == WebSocketState.CloseReceived
+                || _clientWebSocket.State == WebSocketState.CloseSent)
             {
-                await _clientWebSocket.CloseAsync(ct).ConfigureAwait(false);
+                await _clientWebSocket.CloseAsync(WebSocketCloseStatus.Empty, null, ct).ConfigureAwait(false);
             }
 
             _clientWebSocket.Dispose();
@@ -437,9 +500,19 @@ namespace MorseL.Client
             {
                 await _receiveLoopTask;
             }
+
+            // Fire the closed event if necessary
+            FireClosed();
         }
 
-        private async Task Receive(Func<Message, Task> handleMessage, CancellationToken ct)
+        private void FireClosed(Exception e = null)
+        {
+            if (_wasClosedInvoked) return;
+            _wasClosedInvoked = true;
+            Closed?.Invoke(e);
+        }
+
+        private async Task Receive(Func<Stream, Task> handleMessage, CancellationToken ct)
         {
             Exception closingException = null;
 
@@ -447,49 +520,72 @@ namespace MorseL.Client
             {
                 try
                 {
-                    var receivedMessage = await _clientWebSocket.RecieveAsync(ct).ConfigureAwait(false);
+                    ArraySegment<byte> buffer = new ArraySegment<byte>(new byte[1024 * 4]);
 
-                    var receiveIterator = _middleware.GetEnumerator();
-                    RecieveDelegate receiveDelegator = null;
-                    receiveDelegator = async transformedMessage =>
+                    using (var stream = _clientWebSocket.GetReadStream())
                     {
-                        if (receiveIterator.MoveNext())
-                        {
-                            using (_logger?.Tracer($"Middleware[{receiveIterator.Current.GetType()}].RecieveAsync(...)"))
-                            {
-                                await receiveIterator.Current.RecieveAsync(transformedMessage, receiveDelegator).ConfigureAwait(false);
-                            }
-                        }
-                        else
-                        {
-                            using (_logger?.Tracer("Connection.InternalReceive(...)"))
-                            {
-                                await InternalReceive(transformedMessage, handleMessage).ConfigureAwait(false);
-                            }
-                        }
-                    };
+                        // Wait for data
+                        await stream.WaitForDataAsync(ct);
 
-                    await receiveDelegator(receivedMessage)
-                        .ContinueWith(task =>
+                        var receiveIterator = _middleware.GetEnumerator();
+                        RecieveDelegate receiveDelegator = null;
+                        receiveDelegator = async transformedMessage =>
                         {
-                            // Dispose of our middleware iterator before we handle possible exceptions
-                            receiveIterator.Dispose();
+                            if (receiveIterator.MoveNext())
+                            {
+                                using (_logger?.Tracer($"Middleware[{receiveIterator.Current.GetType()}].RecieveAsync(...)"))
+                                {
+                                    await receiveIterator.Current.RecieveAsync(new ConnectionContext(_clientWebSocket, transformedMessage.Stream), receiveDelegator).ConfigureAwait(false);
+                                }
+                            }
+                            else
+                            {
+                                using (_logger?.Tracer("Connection.InternalReceive(...)"))
+                                {
+                                    await handleMessage(transformedMessage.Stream).ConfigureAwait(false);
+                                }
+                            }
+                        };
 
-                            // Unwrap and allow the outer catch to handle if we have an exception
-                            task.WaitAndUnwrapException();
-                        })
-                        .ConfigureAwait(false);
+                        await receiveDelegator(new ConnectionContext(_clientWebSocket, stream))
+                            .ContinueWith(task =>
+                            {
+                                // Dispose of our middleware iterator before we handle possible exceptions
+                                receiveIterator.Dispose();
+
+                                // Unwrap and allow the outer catch to handle if we have an exception
+                                task.WaitAndUnwrapException();
+                            })
+                            .ConfigureAwait(false);
+                    }
                 }
                 catch (WebSocketClosedException e)
                 {
+                    _logger.LogWarning("Observed WebSocketClosedException - likely OK");
+
                     // Eat the exception because we're closing
                     closingException = e;
+
+                    try
+                    {
+                        if (_clientWebSocket.State == WebSocketState.CloseReceived)
+                        {
+                            // Attempt to be "good" and close
+                            await _clientWebSocket.CloseAsync(WebSocketCloseStatus.NormalClosure, null, ct);
+                        }
+                    }
+                    catch (Exception) { }
+
+                    // Fire the closing event
+                    FireClosed(e);
 
                     // But we cancel out because the socket is closed
                     break;
                 }
                 catch (Exception e)
                 {
+                    _logger.LogError(new EventId(), e, $"Observed {e.GetType()}!");
+
                     Error?.Invoke(e);
                 }
             }
@@ -506,29 +602,7 @@ namespace MorseL.Client
             foreach (var request in calls)
             {
                 request.Registration.Dispose();
-                request.Completion.TrySetException(closingException ?? new WebSocketClosedException("The websocket has been closed!"));
-            }
-        }
-
-        private async Task InternalReceive(WebSocketPacket receivedMessage, Func<Message, Task> handleMessage)
-        {
-            switch (receivedMessage.MessageType)
-            {
-                case WebSocketMessageType.Binary:
-                    // TODO: Implement.
-                    throw new NotImplementedException("Binary messages not supported.");
-
-                case WebSocketMessageType.Text:
-                    var serializedMessage = Encoding.UTF8.GetString(receivedMessage.Data);
-                    var message = Json.Deserialize<Message>(serializedMessage);
-                    await handleMessage(message).ConfigureAwait(false);
-                    break;
-
-                case WebSocketMessageType.Close:
-                    await _clientWebSocket.CloseAsync(CancellationToken.None).ConfigureAwait(false);
-                    break;
-                default:
-                    throw new ArgumentOutOfRangeException();
+                request.Completion.TrySetException(closingException ?? new WebSocketClosedException("The WebSocket has been closed!"));
             }
         }
 

@@ -3,35 +3,59 @@ using System.Collections.Generic;
 using System.Net;
 using System.Text;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Logging;
 using MorseL.Client;
 using MorseL.Common;
 using MorseL.Shared.Tests;
 using MorseL.Shared.Tests.Extensions;
 using Xunit;
+using Xunit.Abstractions;
 
 namespace MorseL.Tests.Client
 {
-    public class EndToEndClientTests
+    public class Context
     {
+        public readonly PortPool PortPool = new PortPool(6000, 6050);
+    }
+
+    [Trait("Category", "Client")]
+    public class EndToEndClientTests : IClassFixture<Context>
+    {
+        private readonly ITestOutputHelper _testOutputHelper;
+        private ILogger _logger;
+        private Context _context;
+
+        public EndToEndClientTests(Context context, ITestOutputHelper testOutputHelper)
+        {
+            _testOutputHelper = testOutputHelper;
+            _logger = new TestOutputHelperLogger(_testOutputHelper);
+            _context = context;
+        }
+
         [Fact]
         public async void ShouldThrowOnMoreThanOneCallToStartAsync()
         {
-            using (new SimpleMorseLServer<EndToEndTests.TestHub>(IPAddress.Any, 54321).Start())
+            using (var server = new SimpleMorseLServer<EndToEndTests.TestHub>(logger: _logger))
             {
-                var client = new Connection("ws://localhost:54321/hub", null, o => o.ThrowOnMissingHubMethodInvoked = true);
+                await server.Start(_context.PortPool);
+
+                var client = new Connection(server.Uri, null, o => o.ThrowOnMissingHubMethodInvoked = true, logger: _logger);
                 await client.StartAsync();
                 await AssertEx.ThrowsAsync<MorseLException>(
                     () => client.StartAsync(),
                     e => e.Message.Equals("Cannot call StartAsync more than once.", StringComparison.Ordinal));
+                await client.DisposeAsync();
             }
         }
 
         [Fact]
         public async void ShouldThrowOnCallToStartAsyncAfterDisposeAsync()
         {
-            using (new SimpleMorseLServer<EndToEndTests.TestHub>(IPAddress.Any, 54321).Start())
+            using (var server = new SimpleMorseLServer<EndToEndTests.TestHub>(logger: _logger))
             {
-                var client = new Connection("ws://localhost:54321/hub", null, o => o.ThrowOnMissingHubMethodInvoked = true);
+                await server.Start(_context.PortPool);
+
+                var client = new Connection(server.Uri, null, o => o.ThrowOnMissingHubMethodInvoked = true, logger: _logger);
                 await client.StartAsync();
                 await client.DisposeAsync();
                 await AssertEx.ThrowsAsync<MorseLException>(
@@ -43,9 +67,11 @@ namespace MorseL.Tests.Client
         [Fact]
         public async void ShouldNotThrowOnCallToDisposeAsyncBeforeStartAsync()
         {
-            using (new SimpleMorseLServer<EndToEndTests.TestHub>(IPAddress.Any, 54321).Start())
+            using (var server = new SimpleMorseLServer<EndToEndTests.TestHub>(logger: _logger))
             {
-                var client = new Connection("ws://localhost:54321/hub", null, o => o.ThrowOnMissingHubMethodInvoked = true);
+                await server.Start(_context.PortPool);
+
+                var client = new Connection(server.Uri, null, o => o.ThrowOnMissingHubMethodInvoked = true, logger: _logger);
                 await client.StartAsync();
                 await client.DisposeAsync();
             }
@@ -54,9 +80,15 @@ namespace MorseL.Tests.Client
         [Fact]
         public async void ShouldThrowOnMoreThanOneCallToDisposeAsyncAfterStartAsync()
         {
-            using (new SimpleMorseLServer<EndToEndTests.TestHub>(IPAddress.Any, 54321).Start())
+            using (var server = new SimpleMorseLServer<EndToEndTests.TestHub>(logger: _logger))
             {
-                var client = new Connection("ws://localhost:54321/hub", null, o => o.ThrowOnMissingHubMethodInvoked = true);
+                await Task.Delay(1000);
+                await server.Start(_context.PortPool);
+
+                var client = new Connection(
+                    server.Uri,
+                    null, o => o.ThrowOnMissingHubMethodInvoked = true,
+                    logger: _logger);
                 await client.StartAsync();
                 await client.DisposeAsync();
                 await AssertEx.ThrowsAsync<MorseLException>(
@@ -68,9 +100,11 @@ namespace MorseL.Tests.Client
         [Fact]
         public async Task ShouldThrowOnInvokeAsyncWhenNotConnected()
         {
-            using (new SimpleMorseLServer<EndToEndTests.TestHub>(IPAddress.Any, 54321).Start())
+            using (var server = new SimpleMorseLServer<EndToEndTests.TestHub>(logger: _logger))
             {
-                var client = new Connection("ws://localhost:54321/hub", null, o => o.ThrowOnMissingHubMethodInvoked = true);
+                await server.Start(_context.PortPool);
+
+                var client = new Connection(server.Uri, null, o => o.ThrowOnMissingHubMethodInvoked = true, logger: _logger);
                 await client.StartAsync();
                 await client.DisposeAsync();
                 await AssertEx.ThrowsAsync<MorseLException>(
@@ -82,9 +116,11 @@ namespace MorseL.Tests.Client
         [Fact]
         public async Task ShouldThrowOnInvokeAsyncWhenDisposed()
         {
-            using (new SimpleMorseLServer<EndToEndTests.TestHub>(IPAddress.Any, 54321).Start())
+            using (var server = new SimpleMorseLServer<EndToEndTests.TestHub>(logger: _logger))
             {
-                var client = new Connection("ws://localhost:54321/hub", null, o => o.ThrowOnMissingHubMethodInvoked = true);
+                await server.Start(_context.PortPool);
+
+                var client = new Connection(server.Uri, null, o => o.ThrowOnMissingHubMethodInvoked = true, logger: _logger);
                 await client.StartAsync();
                 await client.DisposeAsync();
                 await AssertEx.ThrowsAsync<MorseLException>(

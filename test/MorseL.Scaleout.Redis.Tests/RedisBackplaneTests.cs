@@ -19,8 +19,10 @@ using Xunit;
 
 namespace MorseL.Scaleout.Redis.Tests
 {
+    [Trait("Category", "Scaleout")]
     public class RedisBackplaneTests
     {
+        private const string REDIS_URI = "localhost:6379";
         private int _nextId;
 
         [Fact]
@@ -30,7 +32,7 @@ namespace MorseL.Scaleout.Redis.Tests
                 o.AddSingleton<IBackplane, RedisBackplane>();
                 o.Configure<ConfigurationOptions>(options =>
                 {
-                    options.EndPoints.Add("localhost:6379");
+                    options.EndPoints.Add(REDIS_URI);
                 });
             });
 
@@ -52,7 +54,7 @@ namespace MorseL.Scaleout.Redis.Tests
                 o.AddSingleton<IBackplane, RedisBackplane>();
                 o.Configure<ConfigurationOptions>(options =>
                 {
-                    options.EndPoints.Add("localhost:6379");
+                    options.EndPoints.Add(REDIS_URI);
                 });
             });
 
@@ -76,7 +78,7 @@ namespace MorseL.Scaleout.Redis.Tests
                 o.AddSingleton<IBackplane, RedisBackplane>();
                 o.Configure<ConfigurationOptions>(options =>
                 {
-                    options.EndPoints.Add("localhost:6379");
+                    options.EndPoints.Add(REDIS_URI);
                 });
             });
 
@@ -97,7 +99,7 @@ namespace MorseL.Scaleout.Redis.Tests
                 o.AddSingleton<IBackplane, RedisBackplane>();
                 o.Configure<ConfigurationOptions>(options =>
                 {
-                    options.EndPoints.Add("localhost:6379");
+                    options.EndPoints.Add(REDIS_URI);
                 });
             });
 
@@ -119,7 +121,7 @@ namespace MorseL.Scaleout.Redis.Tests
                 o.AddSingleton<IBackplane, RedisBackplane>();
                 o.Configure<ConfigurationOptions>(options =>
                 {
-                    options.EndPoints.Add("localhost:6379");
+                    options.EndPoints.Add(REDIS_URI);
                 });
             });
 
@@ -144,7 +146,7 @@ namespace MorseL.Scaleout.Redis.Tests
                 o.AddSingleton<IBackplane, RedisBackplane>();
                 o.Configure<ConfigurationOptions>(options =>
                 {
-                    options.EndPoints.Add("localhost:6379");
+                    options.EndPoints.Add(REDIS_URI);
                 });
             });
 
@@ -196,7 +198,7 @@ namespace MorseL.Scaleout.Redis.Tests
                 o.AddSingleton<IBackplane, RedisBackplane>();
                 o.Configure<ConfigurationOptions>(options =>
                 {
-                    options.EndPoints.Add("localhost:6379");
+                    options.EndPoints.Add(REDIS_URI);
                 });
             });
 
@@ -269,7 +271,7 @@ namespace MorseL.Scaleout.Redis.Tests
                 }
             }
 
-            return Json.Deserialize<Message>(serializedMessage);
+            return MessageSerializer.Deserialize<Message>(serializedMessage);
         }
 
         private async Task<InvocationResultDescriptor> ReadInvocationResultFromSocket<TReturnType>(WebSocket socket)
@@ -277,7 +279,7 @@ namespace MorseL.Scaleout.Redis.Tests
             var message = await ReadMessageFromSocketAsync(socket);
             var pendingCalls = new Dictionary<string, InvocationRequest>();
             pendingCalls.Add(_nextId.ToString(), new InvocationRequest(new CancellationToken(), typeof(TReturnType)));
-            return Json.DeserializeInvocationResultDescriptor(message.Data, pendingCalls);
+            return MessageSerializer.DeserializeInvocationResultDescriptor(message.Data, pendingCalls);
         }
     }
 
