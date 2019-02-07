@@ -14,7 +14,7 @@ using Microsoft.Extensions.Logging.Abstractions;
 using MorseL.Client.Middleware;
 using MorseL.Common;
 using MorseL.Common.Serialization;
-using MorseL.Common.WebSocket.Extensions;
+using MorseL.Common.WebSockets.Extensions;
 using MorseL.Common.WebSockets.Exceptions;
 using MorseL.Diagnostics;
 using Newtonsoft.Json;

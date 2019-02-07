@@ -5,9 +5,8 @@ using System.Net.WebSockets;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
-using MorseL.Common.WebSockets;
 
-namespace MorseL.Common.WebSocket.Extensions
+namespace MorseL.Common.WebSockets.Extensions
 {
     internal static class ClientWebSocketExtensions
     {

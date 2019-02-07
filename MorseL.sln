@@ -62,7 +62,7 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "MorseL.Scaleout.Tests", "te
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "MorseL.Scaleout.Redis.Tests", "test\MorseL.Scaleout.Redis.Tests\MorseL.Scaleout.Redis.Tests.csproj", "{92606BC5-6510-4331-8127-11FF61B0602B}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "MorseL.Common.WebSockets", "src\MorseL.Common.WebSocket\MorseL.Common.WebSockets.csproj", "{930FF34F-11EF-49D9-9680-1578429AC477}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "MorseL.Common.WebSockets", "src\MorseL.Common.WebSockets\MorseL.Common.WebSockets.csproj", "{930FF34F-11EF-49D9-9680-1578429AC477}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MorseL.Transmission.Tests", "test\MorseL.Transmission.Tests\MorseL.Transmission.Tests.csproj", "{19F1DA5A-34B1-4842-881B-D3BCA378444A}"
 EndProject
