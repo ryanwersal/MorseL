@@ -14,7 +14,7 @@ namespace MorseL.Scaleout
             return backplane.SendMessageAsync(connectionId, new Message
             {
                 MessageType = MessageType.ClientMethodInvocation,
-                Data = Json.SerializeObject(new InvocationDescriptor()
+                Data = MessageSerializer.SerializeObject(new InvocationDescriptor()
                 {
                     MethodName = methodName,
                     Arguments = arguments
@@ -27,7 +27,7 @@ namespace MorseL.Scaleout
             return backplane.SendMessageGroupAsync(groupName, new Message
             {
                 MessageType = MessageType.ClientMethodInvocation,
-                Data = Json.SerializeObject(new InvocationDescriptor()
+                Data = MessageSerializer.SerializeObject(new InvocationDescriptor()
                 {
                     MethodName = methodName,
                     Arguments = arguments

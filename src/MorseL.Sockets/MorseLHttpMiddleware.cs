@@ -14,6 +14,8 @@ using MorseL.Diagnostics;
 using MorseL.Sockets.Middleware;
 using Nito.AsyncEx.Synchronous;
 using MorseL.Common;
+using MorseL.Sockets.Extensions;
+using MorseL.Common.WebSockets.Exceptions;
 
 namespace MorseL.Sockets
 {
@@ -92,31 +94,39 @@ namespace MorseL.Sockets
                     var connection = await handler.OnConnected(socket, context).ConfigureAwait(false);
 
                     await Receive(socket, connection, middleware, cts,
-                        async (result, serializedInvocationDescriptor) =>
+                        async (stream) =>
                         {
-                            if (result.MessageType == WebSocketMessageType.Text || result.MessageType == WebSocketMessageType.Binary)
+                            string serializedInvocationDescriptor;
+
+                            try
                             {
-                                // We call the connection arg'd method directly to allow for middleware to override the IChannel
-                                var unawaitedTask = Task.Run(async () =>
-                                    {
-                                        try
-                                        {
-                                            await handler.ReceiveAsync(connection, serializedInvocationDescriptor).ConfigureAwait(false);
-                                        }
-                                        catch (Exception exception)
-                                        {
-                                            // An exception here means it was thrown during message handling (not in the Hub method itself)
-                                            // This is a big issue (likely message serialization) and can't be "saved"
-                                            // We'll store the exception and rethrow after the receive loop is brought down
-                                            pendingException = exception;
-                                            cts.Cancel();
-                                        }
-                                    }).ConfigureAwait(false);
+                                using (var reader = new StreamReader(stream, new UTF8Encoding(), true, 8192, false))
+                                {
+                                    serializedInvocationDescriptor = await reader.ReadToEndAsync().ConfigureAwait(false);
+                                }
                             }
-                            else if (result.MessageType == WebSocketMessageType.Close)
+                            catch (WebSocketClosedException e)
                             {
                                 await handler.OnDisconnected(socket, null);
+                                return;
                             }
+
+                            // We call the connection arg'd method directly to allow for middleware to override the IChannel
+                            var unawaitedTask = Task.Run(async () =>
+                            {
+                                try
+                                {
+                                    await handler.ReceiveAsync(connection, serializedInvocationDescriptor).ConfigureAwait(false);
+                                }
+                                catch (Exception exception)
+                                {
+                                    // An exception here means it was thrown during message handling (not in the Hub method itself)
+                                    // This is a big issue (likely message serialization) and can't be "saved"
+                                    // We'll store the exception and rethrow after the receive loop is brought down
+                                    pendingException = exception;
+                                    cts.Cancel();
+                                }
+                            }).ConfigureAwait(false);
                         }).ConfigureAwait(false);
 
                     // Rethrow any exception thrown during message processing that broke our receive loop
@@ -158,76 +168,83 @@ namespace MorseL.Sockets
 
         private async Task Receive(
             WebSocket socket, Connection connection, List<IMiddleware> middleware,
-            CancellationTokenSource cts, Func<WebSocketReceiveResult, string, Task> handleMessage)
+            CancellationTokenSource cts, Func<Stream, Task> handleMessage)
         {
-            while (socket.State == WebSocketState.Open)
+            using (var receiveCts = new CancellationTokenSource())
             {
-                ArraySegment<Byte> buffer = new ArraySegment<byte>(new Byte[1024 * 4]);
-                string serializedInvocationDescriptor = null;
-                WebSocketReceiveResult result = null;
-
-                using (var ms = new MemoryStream())
+                cts.Token.Register(() =>
                 {
-                    do
+                    _logger?.LogDebug("Global CTS received cancellation; attempting best effort closure of socket");
+
+                    // If we were told to die - let's attempt a best effort closure
+                    // to our connected web socket. This covers the case where we
+                    // are manually killing the connection because of a MorseL protocol
+                    // error. The web socket is still valid, in these cases, so we can
+                    // close normally so the socket knows about it.
+                    try
                     {
-                        // WTF is going on?
-                        // .net core doesn't seem to care about a passed in cancellation
-                        // token, that's what :(
-                        var task = socket.ReceiveAsync(buffer, cts.Token);
-
-                        while (!task.IsCompleted && !cts.IsCancellationRequested)
+                        using (var timeoutCts = new CancellationTokenSource(TimeSpan.FromMilliseconds(250)))
                         {
-                            await Task.Delay(100).ConfigureAwait(false);
+                            socket.CloseAsync(WebSocketCloseStatus.NormalClosure, null, timeoutCts.Token);
                         }
-
-                        if (cts.IsCancellationRequested)
-                        {
-                            // Stop. Immediately
-                            return;
-                        }
-
-                        // Grab or throw based on the actual task result
-                        result = await task;
-
-                        ms.Write(buffer.Array, buffer.Offset, result.Count);
-                    } while (!result.EndOfMessage);
-
-                    ms.Seek(0, SeekOrigin.Begin);
-
-                    var context = new ConnectionContext(connection, ms);
-                    var iterator = middleware.GetEnumerator();
-                    MiddlewareDelegate delegator = null;
-                    delegator = async tranformedContext =>
+                    }
+                    // Best effort closure - if an exception is thrown we don't really care
+                    catch (Exception e)
                     {
-                        if (iterator.MoveNext())
+                        _logger?.LogWarning(new EventId(), e, "Received error attempting to respectfully close socket");
+                    }
+
+                    // Now kill the receiveCts
+                    receiveCts.Cancel();
+                });
+
+                while (socket.State == WebSocketState.Open)
+                {
+                    using (var stream = socket.GetReadStream())
+                    {
+                        try
                         {
-                            using (_logger?.Tracer($"Middleware[{iterator.Current.GetType()}].ReceiveAsync(...)"))
-                            {
-                                await iterator.Current.ReceiveAsync(context, delegator).ConfigureAwait(false);
-                            }
+                            await stream.WaitForDataAsync();
                         }
-                        else
+                        catch (WebSocketClosedException e)
                         {
-                            using (var reader = new StreamReader(tranformedContext.Stream, Encoding.UTF8))
-                            {
-                                serializedInvocationDescriptor = await reader.ReadToEndAsync().ConfigureAwait(false);
-                            }
-
-                            using (_logger?.Tracer("Receive.handleMessage(...)"))
-                            {
-                                await handleMessage(result, serializedInvocationDescriptor);
-                            }
+                            // Squelch this exception as we likely received a separate
+                            // exception preceeding this one.
+                            // But, we don't want to read anymore if we're closed
+                            break;
                         }
-                    };
 
-                    await delegator
-                        .Invoke(context)
-                        .ContinueWith(task => {
-                            iterator.Dispose();
+                        var context = new ConnectionContext(connection, stream);
+                        var iterator = middleware.GetEnumerator();
+                        MiddlewareDelegate delegator = null;
+                        delegator = async tranformedContext =>
+                        {
+                            if (iterator.MoveNext())
+                            {
+                                using (_logger?.Tracer($"Middleware[{iterator.Current.GetType()}].ReceiveAsync(...)"))
+                                {
+                                    await iterator.Current.ReceiveAsync(context, delegator).ConfigureAwait(false);
+                                }
+                            }
+                            else
+                            {
+                                using (_logger?.Tracer("Receive.handleMessage(...)"))
+                                {
+                                    await handleMessage(tranformedContext.Stream);
+                                }
+                            }
+                        };
 
-                            task.WaitAndUnwrapException();
-                        })
-                        .ConfigureAwait(false);
+                        await delegator
+                            .Invoke(context)
+                            .ContinueWith(task =>
+                            {
+                                iterator.Dispose();
+
+                                task.WaitAndUnwrapException();
+                            })
+                            .ConfigureAwait(false);
+                    }
                 }
             }
         }

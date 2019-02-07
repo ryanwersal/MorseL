@@ -1,6 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Net.Sockets;
+using System.Net.WebSockets;
 using System.Text;
 using System.Threading.Tasks;
 using MorseL.Common;
@@ -9,13 +9,14 @@ using Xunit;
 
 namespace MorseL.Client.Tests
 {
+    [Trait("Category", "Client")]
     public class ClientTests
     {
         [Fact]
         public async Task ShouldThrowOnConnectToInvalidHost()
         {
             var connection = new Connection("ws://asdfasdf:5000");
-            await Assert.ThrowsAsync<SocketException>(() => connection.StartAsync());
+            await Assert.ThrowsAsync<WebSocketException>(() => connection.StartAsync());
         }
 
         [Fact]
