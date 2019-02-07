@@ -15,7 +15,6 @@ jobs:
 
   - script: |
       dotnet test test/MorseL.Client.Tests --logger trx
-      dotnet test test/MorseL.Client.WebSockets.Tests --logger trx
       dotnet test test/MorseL.Scaleout.Redis.Tests --logger trx
       dotnet test test/MorseL.Scaleout.Tests --logger trx
       dotnet test test/MorseL.Sockets.Tests --logger trx
@@ -49,7 +48,6 @@ jobs:
 
   - script: |
       dotnet test test/MorseL.Client.Tests --logger trx
-      dotnet test test/MorseL.Client.WebSockets.Tests --logger trx
       dotnet test test/MorseL.Scaleout.Redis.Tests --logger trx
       dotnet test test/MorseL.Scaleout.Tests --logger trx
       dotnet test test/MorseL.Sockets.Tests --logger trx
@@ -85,7 +83,6 @@ jobs:
 
   - script: |
       dotnet test test/MorseL.Client.Tests --logger trx
-      dotnet test test/MorseL.Client.WebSockets.Tests --logger trx
       dotnet test test/MorseL.Scaleout.Redis.Tests --logger trx
       dotnet test test/MorseL.Scaleout.Tests --logger trx
       dotnet test test/MorseL.Sockets.Tests --logger trx

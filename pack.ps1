@@ -8,13 +8,13 @@ param(
 
 $projects = @(
     "MorseL",
-    "MorseL.Common",`
+    "MorseL.Common",
+    "MorseL.Common.WebSockets",
     "MorseL.Diagnostics",
     "MorseL.Client",
     "MorseL.Sockets",
     "MorseL.Scaleout",
-    "MorseL.Scaleout.Redis",
-    "MorseL.Client.WebSockets"
+    "MorseL.Scaleout.Redis"
 )
 
 $packArguments = New-Object System.Collections.ArrayList
