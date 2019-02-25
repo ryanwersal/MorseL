@@ -486,26 +486,22 @@ namespace MorseL.Client
             if (_isDisposed) throw new MorseLException("This connection has already been disposed.");
             _isDisposed = true;
 
-            Exception exception = null;
-
             // These states were determined based on error messages thrown when sending
             // CloseAsync in a bad state ¯\_(ツ)_/¯
             if (_clientWebSocket.State == WebSocketState.Open
                 || _clientWebSocket.State == WebSocketState.CloseReceived
                 || _clientWebSocket.State == WebSocketState.CloseSent)
             {
+                // Intentionally ignore all exceptions when closing a socket. We don't care if
+                // it is unsuccessful due to an error as they will just timeout on the server
+                // eventually.
                 try
                 {
                     await _clientWebSocket.CloseAsync(WebSocketCloseStatus.Empty, null, ct).ConfigureAwait(false);
                 }
-                catch (IOException ex) when (ex.InnerException is SocketException)
+                catch (Exception ex)
                 {
-                    // Ignore SocketExceptions intentionally when closing a socket. The main reason for this
-                    // is issues encountered when losing network connection. Closing a socket after losing
-                    // network connection results in a "network subsystem is down" exception. It tries to
-                    // send a close message but cannot because there is no connection anymore.
-                    exception = ex;
-                    _logger.LogWarning(new EventId(), ex, "Observed SocketException - likely OK");
+                    _logger.LogWarning(new EventId(), ex, "Observed exception when closing the socket.");
                 }
             }
 
@@ -517,7 +513,7 @@ namespace MorseL.Client
             }
 
             // Fire the closed event if necessary
-            FireClosed(exception);
+            FireClosed();
         }
 
         private void FireClosed(Exception e = null)
