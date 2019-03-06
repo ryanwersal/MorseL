@@ -570,6 +570,33 @@ namespace MorseL.Client
                             .ConfigureAwait(false);
                     }
                 }
+                catch (WebSocketException e) when (e.Message == "The remote party closed the WebSocket connection without completing the close handshake.")
+                {
+                    _logger.LogWarning("Observed WebSocketException - likely OK");
+
+                    // Eat the exception because we're closing
+                    closingException = e;
+
+                    try
+                    {
+                        if (_clientWebSocket.State == WebSocketState.CloseReceived)
+                        {
+                            // Attempt to be "good" and close
+                            await _clientWebSocket.CloseAsync(WebSocketCloseStatus.NormalClosure, null, ct);
+                        }
+                        else
+                        {
+                            _clientWebSocket.Abort();
+                        }
+                    }
+                    catch (Exception) { }
+
+                    // Fire the closing event
+                    FireClosed(e);
+
+                    // But we cancel out because the socket is closed
+                    break;
+                }
                 catch (WebSocketClosedException e)
                 {
                     _logger.LogWarning("Observed WebSocketClosedException - likely OK");
