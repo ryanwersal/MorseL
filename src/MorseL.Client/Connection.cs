@@ -17,6 +17,7 @@ using MorseL.Diagnostics;
 using WebSocketMessageType = MorseL.Client.WebSockets.WebSocketMessageType;
 using WebSocketState = WebSocket4Net.WebSocketState;
 using Newtonsoft.Json.Linq;
+using System.IO;
 
 [assembly: InternalsVisibleTo("MorseL.Scaleout.Redis.Tests")]
 [assembly: InternalsVisibleTo("MorseL.Tests")]
@@ -48,6 +49,16 @@ namespace MorseL.Client
         private readonly WebSocketClient _clientWebSocket;
         private readonly string _name;
         private readonly ILogger _logger;
+
+        /// <summary>
+        /// Receiving is handled by a single async process spinning and reading
+        /// so we don't have to worry about stomping over the websocket with
+        /// receive requests. Writing, on the other hand, is hand-wavy concurrent,
+        /// and actually does need to make sure individual messages are sent
+        /// atomically.
+        /// </summary>
+        private readonly SemaphoreSlim _writeLock = new SemaphoreSlim(1, 1);
+
         private bool _hasStarted;
         private bool _isDisposed;
 
@@ -319,36 +330,57 @@ namespace MorseL.Client
 
         private async Task SendMessageAsync(string message)
         {
-            var transformIterator = _middleware.GetEnumerator();
+            await SendMessageAsync(async (stream) => 
+            {
+                using (var memoryStream = new MemoryStream(Encoding.UTF8.GetBytes(message)))
+                    await memoryStream.CopyToAsync(stream);
+            });
+        }
+
+        private async Task SendMessageAsync(Func<Stream, Task> writer)
+        {
+            var transformIterator = ((IEnumerable<IMiddleware>)_middleware).Reverse().GetEnumerator();
             TransmitDelegate transformDelegator = null;
-            transformDelegator = async data =>
+            transformDelegator = async transformedStream =>
             {
                 if (transformIterator.MoveNext())
                 {
                     using (_logger?.Tracer($"Middleware[{transformIterator.Current.GetType()}].SendAsync(...)"))
                     {
-                        await transformIterator.Current.SendAsync(data, transformDelegator).ConfigureAwait(false);
+                        await transformIterator.Current.SendAsync(transformedStream, transformDelegator).ConfigureAwait(false);
                     }
                 }
                 else
                 {
-                    using (_logger?.Tracer("Connection.SendAsync(...)"))
-                    {
-                        await _clientWebSocket.SendAsync(data, CancellationToken.None).ConfigureAwait(false);
-                    }
+                    await writer(transformedStream).ConfigureAwait(false);
                 }
             };
-            await transformDelegator
-                .Invoke(message)
-                .ContinueWith(task =>
-                {
-                    // Dispose first before handling return state
-                    transformIterator.Dispose();
 
-                    // Unwrap and allow the outer exception handler to handle this case
-                    task.WaitAndUnwrapException();
-                })
-                .ConfigureAwait(false);
+            await _writeLock.WaitAsync();
+            try
+            {
+                using (var writeStream = new MemoryStream())
+                {
+                    await transformDelegator
+                        .Invoke(writeStream)
+                        .ContinueWith(async task =>
+                        {
+                            // Dispose first before handling return state
+                            transformIterator.Dispose();
+
+                            // Unwrap and allow the outer exception handler to handle this case
+                            task.WaitAndUnwrapException();
+                        })
+                        .ConfigureAwait(false);
+
+                    var data = Encoding.UTF8.GetString(writeStream.ToArray());
+                    await _clientWebSocket.SendAsync(data);
+                }
+            }
+            finally
+            {
+                _writeLock.Release();
+            }
         }
 
         private Task InvokeOn(InvocationDescriptor descriptor)
@@ -469,16 +501,19 @@ namespace MorseL.Client
                         }
                     };
 
-                    await receiveDelegator(receivedMessage)
-                        .ContinueWith(task =>
-                        {
-                            // Dispose of our middleware iterator before we handle possible exceptions
-                            receiveIterator.Dispose();
+                    using (var messageStream = new MemoryStream(receivedMessage.Data))
+                    {
+                        await receiveDelegator(new ConnectionContext(receivedMessage.MessageType, messageStream))
+                            .ContinueWith(task =>
+                            {
+                                // Dispose of our middleware iterator before we handle possible exceptions
+                                receiveIterator.Dispose();
 
-                            // Unwrap and allow the outer catch to handle if we have an exception
-                            task.WaitAndUnwrapException();
-                        })
-                        .ConfigureAwait(false);
+                                // Unwrap and allow the outer catch to handle if we have an exception
+                                task.WaitAndUnwrapException();
+                            })
+                            .ConfigureAwait(false);
+                    }
                 }
                 catch (WebSocketClosedException e)
                 {
@@ -510,7 +545,7 @@ namespace MorseL.Client
             }
         }
 
-        private async Task InternalReceive(WebSocketPacket receivedMessage, Func<Message, Task> handleMessage)
+        private async Task InternalReceive(ConnectionContext receivedMessage, Func<Message, Task> handleMessage)
         {
             switch (receivedMessage.MessageType)
             {
@@ -519,9 +554,12 @@ namespace MorseL.Client
                     throw new NotImplementedException("Binary messages not supported.");
 
                 case WebSocketMessageType.Text:
-                    var serializedMessage = Encoding.UTF8.GetString(receivedMessage.Data);
-                    var message = Json.Deserialize<Message>(serializedMessage);
-                    await handleMessage(message).ConfigureAwait(false);
+                    using (var streamReader = new StreamReader(receivedMessage.Stream))
+                    {
+                        var serializedMessage = await streamReader.ReadToEndAsync();
+                        var message = Json.Deserialize<Message>(serializedMessage);
+                        await handleMessage(message).ConfigureAwait(false);
+                    }
                     break;
 
                 case WebSocketMessageType.Close:

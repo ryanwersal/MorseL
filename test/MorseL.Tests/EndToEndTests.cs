@@ -17,7 +17,11 @@ using MorseL.Extensions;
 using MorseL.Shared.Tests;
 using MorseL.Sockets.Middleware;
 using Xunit.Abstractions;
-using IMiddleware = MorseL.Client.Middleware.IMiddleware;
+using IClientMiddleware = MorseL.Client.Middleware.IMiddleware;
+using ClientConnectionContext = MorseL.Client.Middleware.ConnectionContext;
+using IHubMiddleware = MorseL.Sockets.Middleware.IMiddleware;
+using HubConnectionContext = MorseL.Sockets.Middleware.ConnectionContext;
+using System.IO;
 
 namespace MorseL.Tests
 {
@@ -194,17 +198,27 @@ namespace MorseL.Tests
         [Theory]
         [InlineData("SomeNonExistentMethod", "SomeMethodArgument")]
         [InlineData("SomeOtherNonExistentMethod", 5)]
-        public async void HubInvokingNonExistentClientMethodThrowsInHubWithMiddleware(string methodName, params object[] arguments)
+        public async void HubInvokingNonExistentClientMethodThrowsInHubWithMiddleware(
+            string methodName,
+            params object[] arguments)
         {
-            Exception exception = null;
-            using (new SimpleMorseLServer<TestHub>(IPAddress.Any, 5000, (s, b) =>
+            var tcs = new TaskCompletionSource<Exception>();
+            string connectionId = null;
+            
+            using (new SimpleMorseLServer<TestHub>(IPAddress.Any, 5000, (
+                    s,
+                    b) =>
                 {
                     s.Configure<Extensions.MorseLOptions>(o => o.ThrowOnMissingClientMethodInvoked = true);
                     b.AddMiddleware<Base64HubMiddleware>(ServiceLifetime.Transient);
                 },
-                (app, services) =>
+                (
+                    app,
+                    services) =>
                 {
-                    app.Use(async (context, next) =>
+                    app.Use(async (
+                        context,
+                        next) =>
                     {
                         try
                         {
@@ -212,7 +226,7 @@ namespace MorseL.Tests
                         }
                         catch (Exception e)
                         {
-                            exception = e;
+                            tcs.SetResult(e);
                         }
                     });
                 }).Start())
@@ -227,8 +241,11 @@ namespace MorseL.Tests
                 var expectedMethodName = string.IsNullOrWhiteSpace(methodName) ? "[Invalid Method Name]" : methodName;
                 var expectedArgumentList = arguments?.Length > 0 ? string.Join(", ", arguments) : "[No Parameters]";
 
-                await Task.Delay(500);
+                await Task.WhenAny(tcs.Task, Task.Delay(5000));
 
+                Assert.True(tcs.Task.IsCompleted);
+
+                var exception = await tcs.Task;
                 Assert.NotNull(exception);
                 Assert.Equal(
                     $"Error: Cannot find method \"{expectedMethodName}({expectedArgumentList})\" from {client.ConnectionId}",
@@ -634,34 +651,45 @@ namespace MorseL.Tests
             }
         }
 
-        public class Base64HubMiddleware : Sockets.Middleware.IMiddleware
+        public class Base64HubMiddleware : IHubMiddleware
         {
-            public async Task SendAsync(ConnectionContext context, MiddlewareDelegate next)
+            public async Task SendAsync(HubConnectionContext context, MiddlewareDelegate next)
             {
-                await next(new ConnectionContext(
-                    context.Connection,
-                    new CryptoStream(context.Stream, new ToBase64Transform(), CryptoStreamMode.Read)));
+                using (var stream = new CryptoStream(context.Stream, new ToBase64Transform(), CryptoStreamMode.Read))
+                {
+                    await next(new HubConnectionContext(
+                        context.Connection,
+                        stream));
+                }
             }
 
-            public async Task ReceiveAsync(ConnectionContext context, MiddlewareDelegate next)
+            public async Task ReceiveAsync(HubConnectionContext context, MiddlewareDelegate next)
             {
-                await next(new ConnectionContext(
-                    context.Connection,
-                    new CryptoStream(context.Stream, new FromBase64Transform(), CryptoStreamMode.Read)));
+                using (var stream = new CryptoStream(context.Stream, new FromBase64Transform(), CryptoStreamMode.Read))
+                {
+                    await next(new HubConnectionContext(
+                        context.Connection,
+                        stream));
+                }
             }
         }
 
-        public class Base64ClientMiddleware : IMiddleware
+        public class Base64ClientMiddleware : MorseL.Client.Middleware.IMiddleware
         {
-            public async Task SendAsync(string data, TransmitDelegate next)
+            public async Task SendAsync(Stream stream, TransmitDelegate next)
             {
-                await next(Convert.ToBase64String(Encoding.UTF8.GetBytes(data)));
+                using (var cryptoStream = new CryptoStream(stream, new ToBase64Transform(), CryptoStreamMode.Write))
+                {
+                    await next(cryptoStream);
+                }
             }
 
-            public async Task RecieveAsync(WebSocketPacket packet, RecieveDelegate next)
+            public async Task RecieveAsync(ClientConnectionContext context, RecieveDelegate next)
             {
-                await next(new WebSocketPacket(packet.MessageType,
-                    Convert.FromBase64String(Encoding.UTF8.GetString(packet.Data))));
+                using (var cryptoStream = new CryptoStream(context.Stream, new FromBase64Transform(), CryptoStreamMode.Read))
+                {
+                    await next(new ClientConnectionContext(context.MessageType, cryptoStream));
+                }
             }
         }
     }
