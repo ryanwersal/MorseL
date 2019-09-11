@@ -1,5 +1,7 @@
 ﻿using System;
 using System.Diagnostics;
+using System.IO;
+using System.Security.Cryptography;
 using System.Security.Cryptography.X509Certificates;
 using System.Text;
 using System.Threading.Tasks;
@@ -74,18 +76,18 @@ public class Program
         Debug.WriteLine(result);
     }
 
-    private class Middleware : IMiddleware
+    public class Middleware : IMiddleware
     {
-        public Task SendAsync(string data, TransmitDelegate next)
+        public async Task SendAsync(Stream stream, TransmitDelegate next)
         {
-            data = Convert.ToBase64String(Encoding.UTF8.GetBytes(data));
-            return next(data);
+            await next(new CryptoStream(stream, new ToBase64Transform(), CryptoStreamMode.Write));
         }
 
-        public Task RecieveAsync(WebSocketPacket packet, RecieveDelegate next)
+        public async Task RecieveAsync(ConnectionContext context, RecieveDelegate next)
         {
-            var data = Convert.FromBase64String(Encoding.UTF8.GetString(packet.Data));
-            return next(new WebSocketPacket(packet.MessageType, data));
+            await next(new ConnectionContext(
+                context.MessageType,
+                new CryptoStream(context.Stream, new FromBase64Transform(), CryptoStreamMode.Read)));
         }
     }
 }

@@ -1,9 +1,5 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Runtime.CompilerServices;
-using System.Text;
+﻿using System.IO;
 using System.Threading.Tasks;
-using MorseL.Client.WebSockets;
 
 namespace MorseL.Client.Middleware
 {
@@ -18,12 +14,12 @@ namespace MorseL.Client.Middleware
         /// </summary>
         /// <param name="data">The data being transmitted</param>
         /// <param name="next">The next middleware in the chain</param>
-        Task SendAsync(string data , TransmitDelegate next);
+        Task SendAsync(Stream stream, TransmitDelegate next);
         /// <summary>
         /// Called when the connection is receiving data.
         /// </summary>
         /// <param name="packet">The received data</param>
         /// <param name="next">The next middleware in the chain</param>
-        Task RecieveAsync(WebSocketPacket packet, RecieveDelegate next);
+        Task RecieveAsync(ConnectionContext context, RecieveDelegate next);
     }
 }

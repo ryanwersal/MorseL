@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Net;
+using System.Net.Sockets;
 using System.Runtime.ExceptionServices;
 using System.Security.Authentication;
 using System.Text;
@@ -172,7 +173,7 @@ namespace MorseL.Client.WebSockets
                 // Kill the packet queue
                 _packets.CompleteAdding();
 
-                if (exception != null)
+                if (exception != null && !(exception is WebSocketClosedException || (exception is SocketException && exception.Message == "Socket is not connected")))
                 {
                     ExceptionDispatchInfo.Capture(exception).Throw();
                 }
