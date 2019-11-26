@@ -30,23 +30,30 @@ namespace MorseL.Sockets
         {
             var context = new ConnectionContext(Connection, stream);
             var iterator = Middleware.GetEnumerator();
-            MiddlewareDelegate delegator = null;
-            delegator = async transformedContext =>
-            {
-                if (iterator.MoveNext())
-                {
-                    await iterator.Current.SendAsync(context, delegator).ConfigureAwait(false);
-                }
-                else
-                {
-                    await InternalSendAsync(transformedContext.Stream).ConfigureAwait(false);
-                }
-            };
+            MiddlewareDelegate delegator = BuildMiddlewareDelegate(iterator, InternalSendAsync);
 
             await delegator
                 .Invoke(context)
                 .ContinueWith(task => iterator.Dispose())
                 .ConfigureAwait(false);
+        }
+
+        internal MiddlewareDelegate BuildMiddlewareDelegate(IEnumerator<IMiddleware> iterator, Func<Stream, Task> internalSend)
+        {
+            MiddlewareDelegate delegator = null;
+            delegator = async transformedContext =>
+            {
+                if (iterator.MoveNext())
+                {
+                    await iterator.Current.SendAsync(transformedContext, delegator).ConfigureAwait(false);
+                }
+                else
+                {
+                    await internalSend(transformedContext.Stream).ConfigureAwait(false);
+                }
+            };
+
+            return delegator;
         }
 
         private async Task InternalSendAsync(Stream stream)
