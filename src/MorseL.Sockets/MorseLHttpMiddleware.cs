@@ -216,24 +216,7 @@ namespace MorseL.Sockets
 
                         var context = new ConnectionContext(connection, stream);
                         var iterator = middleware.GetEnumerator();
-                        MiddlewareDelegate delegator = null;
-                        delegator = async tranformedContext =>
-                        {
-                            if (iterator.MoveNext())
-                            {
-                                using (_logger?.Tracer($"Middleware[{iterator.Current.GetType()}].ReceiveAsync(...)"))
-                                {
-                                    await iterator.Current.ReceiveAsync(context, delegator).ConfigureAwait(false);
-                                }
-                            }
-                            else
-                            {
-                                using (_logger?.Tracer("Receive.handleMessage(...)"))
-                                {
-                                    await handleMessage(tranformedContext.Stream);
-                                }
-                            }
-                        };
+                        var delegator = BuildMiddlewareDelegate(iterator, handleMessage);
 
                         await delegator
                             .Invoke(context)
@@ -247,6 +230,30 @@ namespace MorseL.Sockets
                     }
                 }
             }
+        }
+
+        internal MiddlewareDelegate BuildMiddlewareDelegate(List<IMiddleware>.Enumerator iterator, Func<Stream, Task> handleMessage)
+        {
+            MiddlewareDelegate delegator = null;
+            delegator = async tranformedContext =>
+            {
+                if (iterator.MoveNext())
+                {
+                    using (_logger?.Tracer($"Middleware[{iterator.Current.GetType()}].ReceiveAsync(...)"))
+                    {
+                        await iterator.Current.ReceiveAsync(tranformedContext, delegator).ConfigureAwait(false);
+                    }
+                }
+                else
+                {
+                    using (_logger?.Tracer("Receive.handleMessage(...)"))
+                    {
+                        await handleMessage(tranformedContext.Stream);
+                    }
+                }
+            };
+
+            return delegator;
         }
     }
 }

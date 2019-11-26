@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
+using System.IO;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -10,6 +11,7 @@ using MorseLIMiddleware = MorseL.Sockets.Middleware.IMiddleware;
 using Xunit;
 using System.Net.WebSockets;
 using System.Threading;
+using System.Text;
 
 namespace MorseL.Sockets.Test
 {
@@ -141,6 +143,76 @@ namespace MorseL.Sockets.Test
             await sut.Invoke(Mocker.HttpContextMock.Object);
 
             Assert.Same(exception, Hub.DisconnectedException);
+        }
+
+        [Fact]
+        public async Task Additional_Middleware_Should_Be_Given_The_Mutated_Context()
+        {
+            var sut = CreateMorseLHttpMiddleware();
+
+            var middleware = new List<MorseL.Sockets.Middleware.IMiddleware>
+            {
+                new TestMiddleware("First"),
+                new TestMiddleware("Second"),
+                new TestMiddleware("Third")
+            };
+
+            string originalContents = "test stream data";
+            string contents = null;
+
+            var inputStream = new MemoryStream(Encoding.UTF8.GetBytes(originalContents));
+            var mockChannel = new Mock<IChannel>();
+            var connection = new Connection("connectionId", mockChannel.Object);
+            var connectionContext = new MorseL.Sockets.Middleware.ConnectionContext(connection, inputStream);
+            
+            var delegator = sut.BuildMiddlewareDelegate(middleware.GetEnumerator(), async stream => {
+                using (var memStream = new MemoryStream())
+                {
+                    await stream.CopyToAsync(memStream);
+                    contents = Encoding.UTF8.GetString(memStream.ToArray());
+                }
+            });
+
+            await delegator.Invoke(connectionContext);
+
+            string expectedResults = $"RECEIVEDThird:RECEIVEDSecond:RECEIVEDFirst:{originalContents}";
+
+            Assert.Equal(expectedResults, contents);
+        }
+
+        private class TestMiddleware : MorseL.Sockets.Middleware.IMiddleware
+        {
+            private string _prefix;
+            public TestMiddleware(string prefix)
+            {
+                _prefix = prefix;
+            }
+
+            public async Task SendAsync(MorseL.Sockets.Middleware.ConnectionContext context, MorseL.Sockets.Middleware.MiddlewareDelegate next)
+            {
+                string contents = null;
+                using (var memStream = new MemoryStream())
+                {
+                    await context.Stream.CopyToAsync(memStream);
+                    contents = Encoding.UTF8.GetString(memStream.ToArray());
+                }
+
+                contents = $"SENT{_prefix}:{contents}";
+                await next(new MorseL.Sockets.Middleware.ConnectionContext(context.Connection, new MemoryStream(Encoding.UTF8.GetBytes(contents))));
+            }
+
+            public async Task ReceiveAsync(MorseL.Sockets.Middleware.ConnectionContext context, MorseL.Sockets.Middleware.MiddlewareDelegate next)
+            {
+                string contents = null;
+                using (var memStream = new MemoryStream())
+                {
+                    await context.Stream.CopyToAsync(memStream);
+                    contents = Encoding.UTF8.GetString(memStream.ToArray());
+                }
+
+                contents = $"RECEIVED{_prefix}:{contents}";
+                await next(new MorseL.Sockets.Middleware.ConnectionContext(context.Connection, new MemoryStream(Encoding.UTF8.GetBytes(contents))));
+            }
         }
     }
 }
