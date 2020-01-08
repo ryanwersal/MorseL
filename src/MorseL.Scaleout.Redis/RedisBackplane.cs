@@ -52,6 +52,8 @@ namespace MorseL.Scaleout.Redis
         /// </summary>
         private readonly IDictionary<string, IDictionary<string, object>> _subscriptions = new ConcurrentDictionary<string, IDictionary<string, object>>();
 
+        internal int OnMessageCount => _connections.Count();
+
         public RedisBackplane(IOptions<ConfigurationOptions> options)
         {
             _lazyConnection = new Lazy<ConnectionMultiplexer>(() => ConnectionMultiplexer.Connect(options.Value));
@@ -71,18 +73,9 @@ namespace MorseL.Scaleout.Redis
             );
         }
 
-        internal int OnMessageCount => _onMessage?.GetInvocationList().Count() ?? 0;
-        private OnMessageDelegate _onMessage;
-
         public async Task OnClientConnectedAsync(string connectionId, OnMessageDelegate onMessageDelegate)
         {
             _connections.Add(connectionId, onMessageDelegate);
-
-            if (onMessageDelegate != null)
-            {
-                _onMessage += onMessageDelegate;
-            }
-
             var subscriber = Cache.Multiplexer.GetSubscriber();
 
             // Subscribe to messages for the client
@@ -94,13 +87,7 @@ namespace MorseL.Scaleout.Redis
 
         public async Task OnClientDisconnectedAsync(string connectionId)
         {
-            if (_connections.TryGetValue(connectionId, out var onMessageDelegate) && onMessageDelegate != null)
-            {
-                _onMessage -= onMessageDelegate;
-            }
-
             _connections.Remove(connectionId);
-
             var subscriber = Cache.Multiplexer.GetSubscriber();
 
             // Unsubscribe for messages to the client
@@ -234,8 +221,9 @@ namespace MorseL.Scaleout.Redis
         }
 
         private async Task InvokeOnMessage(RedisChannel connectionId, RedisValue message) {
-            if (_onMessage != null) {
-                await _onMessage(
+            if (_connections.TryGetValue(connectionId, out var messageDelegate) && messageDelegate != null)
+            {
+                await messageDelegate.Invoke(
                     connectionId,
                     JsonConvert.DeserializeObject<Message>(message)
                 ).ConfigureAwait(false);

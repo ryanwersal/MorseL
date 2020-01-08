@@ -15,29 +15,17 @@ namespace MorseL.Scaleout
         private readonly IDictionary<string, IDictionary<string, object>> _groups = new ConcurrentDictionary<string, IDictionary<string, object>>();
         private readonly IDictionary<string, IDictionary<string, object>> _subscriptions = new ConcurrentDictionary<string, IDictionary<string, object>>();
 
-        internal int OnMessageCount => _onMessage?.GetInvocationList().Count() ?? 0;
-        private OnMessageDelegate _onMessage;
+        internal int OnMessageCount => _connections.Count();
 
         public Task OnClientConnectedAsync(string connectionId, OnMessageDelegate onMessageDelegate)
         {
             _connections.Add(connectionId, onMessageDelegate);
-
-            if (onMessageDelegate != null)
-            {
-                _onMessage += onMessageDelegate;
-            }
 
             return Task.CompletedTask;
         }
 
         public async Task OnClientDisconnectedAsync(string connectionId)
         {
-            // Deregister the message delegate
-            if (_connections.TryGetValue(connectionId, out OnMessageDelegate onMessageDelegate) && onMessageDelegate != null)
-            {
-                _onMessage -= onMessageDelegate;
-            }
-
             _connections.Remove(connectionId);
 
             // Unsubscribe from groups
@@ -140,8 +128,8 @@ namespace MorseL.Scaleout
         }
 
         private async Task InvokeOnMessage(string connectionId, Message message) {
-            if (_onMessage != null) {
-                await _onMessage(connectionId, message)
+            if (_connections.TryGetValue(connectionId, out var messageDelegate) && messageDelegate != null) {
+                await messageDelegate.Invoke(connectionId, message)
                     .ConfigureAwait(false);
             }
         }
