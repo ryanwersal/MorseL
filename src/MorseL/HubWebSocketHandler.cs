@@ -80,8 +80,6 @@ namespace MorseL
                     connection.Id,
                     async (connectionId, message) => 
                     {
-                        if (!connectionId.Equals(connection.Id)) return;
-
                         // Disconnect messages don't really get sent to the client.
                         // Instead, the server initiates the closing of the connection.
                         if (message.MessageType == MessageType.Disconnect)
