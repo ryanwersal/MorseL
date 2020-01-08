@@ -572,10 +572,10 @@ namespace MorseL.Client
                 }
                 catch (WebSocketException e) when (e.Message == "The remote party closed the WebSocket connection without completing the close handshake.")
                 {
-                    _logger.LogWarning("Observed WebSocketException - likely OK");
+                    _logger.LogWarning("Observed WebSocketException - likely server closing our connection");
 
                     // Eat the exception because we're closing
-                    closingException = e;
+                    closingException = new WebSocketClosedException("Observed WebSocketException - likely server closing our connection", e);
 
                     try
                     {
