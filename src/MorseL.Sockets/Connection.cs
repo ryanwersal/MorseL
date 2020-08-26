@@ -35,6 +35,7 @@ namespace MorseL.Sockets
         {
             await Channel.DisposeAsync();
             _cancellationTokenSource.Cancel();
+            _cancellationTokenSource.Dispose();
         }
     }
 }
