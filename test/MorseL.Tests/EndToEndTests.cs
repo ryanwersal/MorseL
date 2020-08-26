@@ -471,6 +471,88 @@ namespace MorseL.Tests
         }
 
         [Fact]
+        public async Task CanKillClientConnection()
+        {
+            using (var server = new SimpleMorseLServer<TestHub>(logger: _logger))
+            {
+                await server.Start(_context.PortPool);
+
+                var client = new Connection(server.Uri, logger: _logger);
+                await client.StartAsync();
+
+                await Assert.ThrowsAnyAsync<WebSocketClosedException>(async () => await client.Invoke("KillMe"));
+
+                await client.DisposeAsync();
+            }
+        }
+
+        [Fact]
+        public async Task ConnectedClientHasUncanceledConnectionCancellationToken()
+        {
+            using (var server = new SimpleMorseLServer<TestHub>(logger: _logger))
+            {
+                await server.Start(_context.PortPool);
+
+                var client = new Connection(server.Uri, logger: _logger);
+                await client.StartAsync();
+
+                await client.Invoke("VerifyCancellation");
+
+                // Kill the client connection
+                await client.DisposeAsync();
+            }
+        }
+
+        [Fact]
+        public async Task ServerForcedDisconnectedClientCancelsConnectionCancellationToken()
+        {
+            using (var server = new SimpleMorseLServer<TestHub>(logger: _logger))
+            {
+                await server.Start(_context.PortPool);
+
+                var client = new Connection(server.Uri, logger: _logger);
+                await client.StartAsync();
+
+                Assert.ThrowsAnyAsync<TaskCanceledException>(async () => await client.Invoke("WaitForCancellation"));
+
+                // Give a little time for the hub method to fire and start waiting
+                await Task.Delay(200);
+
+                client.Invoke("KillMe");
+
+                // Give a little time for the hub method to fire and kill the connection
+                await Task.Delay(200);
+
+                Assert.IsType<TaskCanceledException>(TestHub.ConnectionCancellationException);
+
+                // Kill the client connection
+                await client.DisposeAsync();
+            }
+        }
+
+        [Fact]
+        public async Task DisconnectedClientCancelsConnectionCancellationToken()
+        {
+            using (var server = new SimpleMorseLServer<TestHub>(logger: _logger))
+            {
+                await server.Start(_context.PortPool);
+
+                var client = new Connection(server.Uri, logger: _logger);
+                await client.StartAsync();
+
+                var awaitable = Assert.ThrowsAnyAsync<TaskCanceledException>(async () => await client.Invoke("WaitForCancellation"));
+
+                // Give a little time for the hub method to fire and start waiting
+                await Task.Delay(200);
+
+                // Kill the client connection
+                await client.DisposeAsync();
+
+                Assert.IsType<TaskCanceledException>(TestHub.ConnectionCancellationException);
+            }
+        }
+
+        [Fact]
         public async Task HubThrowingExceptionDoesntCausePerpetualException()
         {
             using (var server = new SimpleMorseLServer<TestHub>(logger: _logger))
@@ -742,6 +824,8 @@ namespace MorseL.Tests
 
         public class TestHub : Hub
         {
+            public static Exception ConnectionCancellationException;
+
             public void FooBar() { }
 
             public Task PrimeCallback()
@@ -791,6 +875,28 @@ namespace MorseL.Tests
                 // Call the method but don't block on it so our caller gets a response
                 Clients.Client(Context.ConnectionId).InvokeAsync(methodToCall, arguments);
                 return 5;
+            }
+
+            public async Task KillMe()
+            {
+                await Context.Connection.DisposeAsync();
+            }
+
+            public async Task WaitForCancellation()
+            {
+                try
+                {
+                    await Task.Delay(10000, Context.ConnectionCancellationToken);
+                }
+                catch (Exception e)
+                {
+                    ConnectionCancellationException = e;
+                }
+            }
+
+            public async Task VerifyCancellation()
+            {
+                Context.ConnectionCancellationToken.ThrowIfCancellationRequested();
             }
         }
 
