@@ -2,6 +2,7 @@
 // Licensed under the Apache License, Version 2.0. See License.txt in the project root for license information.
 
 using System.Security.Claims;
+using System.Threading;
 using MorseL.Sockets;
 
 namespace MorseL
@@ -18,5 +19,7 @@ namespace MorseL
         public ClaimsPrincipal User => Connection.User;
 
         public string ConnectionId => Connection.Id;
+
+        public CancellationToken ConnectionCancellationToken => Connection.ConnectionCancellationToken;
     }
 }

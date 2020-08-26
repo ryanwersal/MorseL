@@ -16,6 +16,9 @@ namespace MorseL.Sockets
         // TODO: Remove this and instead make connections transport-agnostic.
         public IChannel Channel { get; set; }
 
+        private CancellationTokenSource _cancellationTokenSource { get; } = new CancellationTokenSource();
+        public CancellationToken ConnectionCancellationToken => _cancellationTokenSource.Token;
+
         public Connection(string id, IChannel channel)
         {
             Id = id;
@@ -31,6 +34,7 @@ namespace MorseL.Sockets
         public async Task DisposeAsync()
         {
             await Channel.DisposeAsync();
+            _cancellationTokenSource.Cancel();
         }
     }
 }
