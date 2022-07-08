@@ -9,7 +9,7 @@
     <ProjectReference Include="..\..\..\src\MorseL.Scaleout.Redis\MorseL.Scaleout.Redis.csproj" />
     <ProjectReference Include="..\..\..\src\MorseL\MorseL.csproj" />
 
-    <PackageReference Include="Microsoft.AspNetCore.All" Version="2.0.0" />
+    <PackageReference Include="Microsoft.AspNetCore.All" Version="2.0.9" />
   </ItemGroup>
 
   <ItemGroup>
