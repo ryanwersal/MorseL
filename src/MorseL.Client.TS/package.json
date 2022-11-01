@@ -9,7 +9,7 @@
   "author": "Austin Hanson <berdon@gmail.com>",
   "license": "MIT",
   "devDependencies": {
-    "mocha": "^2.4.5",
+    "mocha": "^10.1.0",
     "ts-loader": "^0.8.1",
     "tslint": "^3.5.0",
     "tslint-loader": "^2.1.0",
